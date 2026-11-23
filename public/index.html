@@ -43,7 +43,7 @@
             <div class="entry-badge badge-owner">箱主</div>
             <h2>箱をつくる・管理する</h2>
             <p class="muted">
-              許可されたGoogleアカウントでログインし、「箱主→ゲスト」「箱主←ゲスト」の箱を作成・管理します。
+              許可されたGoogleアカウントでログインし、「箱主 -&gt; ゲスト」「箱主 &lt;- ゲスト」の箱を作成・管理します。
             </p>
             <button type="button" id="btn-google-login" class="btn btn-primary btn-block">
               Googleアカウントでログイン
@@ -77,8 +77,8 @@
         <div class="toolbar">
           <h1 class="page-title">あなたの箱一覧</h1>
           <div class="toolbar-actions">
-            <button type="button" id="btn-create-send" class="btn btn-primary">＋ 箱主→ゲスト</button>
-            <button type="button" id="btn-create-receive" class="btn btn-secondary">＋ 箱主←ゲスト</button>
+            <button type="button" id="btn-create-send" class="btn btn-primary">＋ 箱主 -&gt; ゲスト</button>
+            <button type="button" id="btn-create-receive" class="btn btn-secondary">＋ 箱主 &lt;- ゲスト</button>
             <button type="button" id="btn-refresh-boxes" class="btn btn-ghost" title="一覧を更新">↻ 更新</button>
           </div>
         </div>
@@ -86,7 +86,7 @@
         <div id="owner-boxes-empty" class="card empty-state hidden">
           <p class="empty-icon">📦</p>
           <p class="empty-title">まだ箱がありません</p>
-          <p class="muted text-sm">「＋ 箱主→ゲスト」または「＋ 箱主←ゲスト」から最初の箱を作成しましょう。</p>
+          <p class="muted text-sm">「＋ 箱主 -&gt; ゲスト」または「＋ 箱主 &lt;- ゲスト」から最初の箱を作成しましょう。</p>
         </div>
 
         <div id="owner-boxes-list" class="box-list"></div>

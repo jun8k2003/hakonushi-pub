@@ -223,7 +223,7 @@ window.HakonushiGuest = (function () {
     if (box.direction === 'SEND') {
       if (badgeEl) {
         badgeEl.className = 'pill pill-send';
-        badgeEl.textContent = '箱主→ゲスト（ダウンロード）';
+        badgeEl.textContent = '箱主 -> ゲスト（ダウンロード）';
       }
       if (subtitleEl) subtitleEl.textContent = '箱主から届いたファイルをダウンロードできます。';
       sendSection.classList.remove('hidden');
@@ -233,7 +233,7 @@ window.HakonushiGuest = (function () {
     } else {
       if (badgeEl) {
         badgeEl.className = 'pill pill-receive';
-        badgeEl.textContent = '箱主←ゲスト（ファイル送信）';
+        badgeEl.textContent = '箱主 <- ゲスト（ファイル送信）';
       }
       if (subtitleEl) subtitleEl.textContent = '有効期限内であれば、箱主へファイルを複数回追加して送ることができます。';
       sendSection.classList.add('hidden');

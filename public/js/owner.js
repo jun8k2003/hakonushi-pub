@@ -151,11 +151,11 @@ window.HakonushiOwner = (function () {
     if (progressPanel) progressPanel.classList.add('hidden');
 
     if (direction === 'SEND') {
-      if (titleEl) titleEl.textContent = '箱をつくる（箱主→ゲスト）';
+      if (titleEl) titleEl.textContent = '箱をつくる（箱主 -> ゲスト）';
       if (filesArea) filesArea.classList.remove('hidden');
       if (submitBtn) submitBtn.textContent = '箱を作成してアップロード';
     } else {
-      if (titleEl) titleEl.textContent = '箱をつくる（箱主←ゲスト）';
+      if (titleEl) titleEl.textContent = '箱をつくる（箱主 <- ゲスト）';
       if (filesArea) filesArea.classList.add('hidden');
       if (submitBtn) submitBtn.textContent = '空の箱を作成する';
     }
@@ -202,7 +202,7 @@ window.HakonushiOwner = (function () {
     var card = document.createElement('article');
     card.className = 'card box-card' + (isActive ? '' : ' box-inactive');
 
-    var directionLabel = box.direction === 'SEND' ? '箱主→ゲスト' : '箱主←ゲスト';
+    var directionLabel = box.direction === 'SEND' ? '箱主 -> ゲスト' : '箱主 <- ゲスト';
     var directionClass = box.direction === 'SEND' ? 'pill-send' : 'pill-receive';
     var statusMap = {
       ACTIVE: { label: '有効', cls: 'pill-active' },
@@ -217,7 +217,7 @@ window.HakonushiOwner = (function () {
       '<div class="box-card-top">' +
         '<div class="box-title-group">' +
           '<div class="box-badges">' +
-            '<span class="pill ' + directionClass + '">' + directionLabel + '</span>' +
+            '<span class="pill ' + directionClass + '">' + api.escapeHtml(directionLabel) + '</span>' +
             '<span class="pill ' + st.cls + '">' + st.label + '</span>' +
             (box.has_passcode ? '<span class="pill pill-passcode">🔒 パスコードあり</span>' : '') +
           '</div>' +
@@ -364,7 +364,7 @@ window.HakonushiOwner = (function () {
     var currentEl = document.getElementById('extend-box-current');
     var selectEl = document.getElementById('input-extend-expires');
 
-    var dirLabel = box.direction === 'SEND' ? '箱主→ゲスト' : '箱主←ゲスト';
+    var dirLabel = box.direction === 'SEND' ? '箱主 -> ゲスト' : '箱主 <- ゲスト';
     if (nameEl) nameEl.textContent = box.box_name || box.box_id;
     if (currentEl) {
       currentEl.textContent = dirLabel + ' ・ 現在の期限: ' + window.HakonushiApi.formatDateTime(box.expires_at);
@@ -405,7 +405,7 @@ window.HakonushiOwner = (function () {
     var checkEl = document.getElementById('checkbox-confirm-delete');
     var confirmBtn = document.getElementById('btn-confirm-delete-box');
 
-    var dirLabel = box.direction === 'SEND' ? '箱主→ゲスト' : '箱主←ゲスト';
+    var dirLabel = box.direction === 'SEND' ? '箱主 -> ゲスト' : '箱主 <- ゲスト';
     var fileCount = (box.files || []).length;
 
     if (nameEl) nameEl.textContent = box.box_name || box.box_id;
@@ -451,7 +451,7 @@ window.HakonushiOwner = (function () {
     }
 
     if (direction === 'SEND' && selectedFiles.length === 0) {
-      window.HakonushiApi.showToast('箱主→ゲストの箱に入れるファイルを1つ以上選択してください。', 'error');
+      window.HakonushiApi.showToast('箱主 -> ゲストの箱に入れるファイルを1つ以上選択してください。', 'error');
       return;
     }
 
