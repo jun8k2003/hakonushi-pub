@@ -80,6 +80,7 @@ function routeAction_(action, payload) {
     },
     listBoxes: handleListBoxes,
     createBox: handleCreateBox,
+    extendBox: handleExtendBox,
     disableBox: handleDisableBox,
     deleteBox: handleDeleteBox,
     initUploadSession: handleInitUploadSession,

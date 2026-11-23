@@ -205,6 +205,57 @@ function handleDeleteBox(owner, payload) {
 }
 
 /**
+ * 箱の有効期限を延長する（ゴミ箱に入っているフォルダは延長不可）
+ * @param {{ email: string }} owner
+ * @param {Object} payload
+ */
+function handleExtendBox(owner, payload) {
+  var boxId = String(payload.boxId || '').trim();
+  if (!boxId) {
+    throw createAppError('INVALID_ARGUMENT', 'boxId が指定されていません。');
+  }
+
+  var expiresHours = Number(payload.expiresHours);
+  if (isNaN(expiresHours) || !isFinite(expiresHours) || expiresHours <= 0) {
+    expiresHours = DEFAULT_EXPIRES_HOURS;
+  }
+  expiresHours = Math.min(Math.max(expiresHours, 0.5), MAX_EXPIRES_HOURS);
+
+  var updated = withScriptLock(function () {
+    var box = findBoxById(boxId);
+    if (!box) {
+      throw createAppError('BOX_NOT_FOUND', '指定された箱が見つかりません。');
+    }
+    if (box.owner_email !== owner.email) {
+      throw createAppError('FORBIDDEN', 'この箱を操作する権限がありません。');
+    }
+    if (!isFolderAlive(box.folder_id)) {
+      throw createAppError(
+        'FOLDER_TRASHED',
+        'この箱のフォルダはゴミ箱に入っている（または削除済みの）ため、有効期限を延長できません。'
+      );
+    }
+
+    var now = new Date();
+    var nextExpiresAt = new Date(now.getTime() + Math.round(expiresHours * 60) * 60 * 1000).toISOString();
+
+    updateBoxByRowIndex(box._rowIndex, {
+      status: BOX_STATUS.ACTIVE,
+      fail_count: 0,
+      expires_at: nextExpiresAt
+    });
+
+    return {
+      box_id: box.box_id,
+      status: BOX_STATUS.ACTIVE,
+      expires_at: nextExpiresAt
+    };
+  });
+
+  return updated;
+}
+
+/**
  * 箱主が SEND 箱へアップロードするための Resumable Upload セッションを開始する
  * @param {{ email: string }} owner
  * @param {Object} payload

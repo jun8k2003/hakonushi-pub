@@ -35,7 +35,7 @@
       <!-- 1. エントリ画面（箱主 / ゲスト選択） -->
       <section id="view-entry" class="view hidden" aria-label="入口選択">
         <div class="hero">
-          <h1>ファイルをあげる箱、もらう箱</h1>
+          <h1>ファイルを、あげる用の箱/もらう用の箱</h1>
         </div>
 
         <div class="entry-grid">
@@ -367,6 +367,44 @@
           <button type="button" class="btn btn-primary" data-close-modal="modal-share-box">閉じる</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- モーダル: 箱の有効期限延長 -->
+  <div id="modal-extend-box" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-extend-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-extend-title">有効期限を延長する</h2>
+        <button type="button" class="btn-icon" data-close-modal="modal-extend-box" aria-label="閉じる">✕</button>
+      </div>
+      <form id="form-extend-box" class="modal-body stack-md">
+        <div class="delete-target-info">
+          <div class="text-xs muted">対象の箱</div>
+          <div id="extend-box-name" class="delete-target-name"></div>
+          <div id="extend-box-current" class="text-xs muted"></div>
+        </div>
+
+        <div>
+          <label class="field-label" for="input-extend-expires">新しい有効期限（今から）</label>
+          <select id="input-extend-expires" class="input">
+            <option value="0.5">30分</option>
+            <option value="1">1時間</option>
+            <option value="3">3時間</option>
+            <option value="6">6時間</option>
+            <option value="24">24時間</option>
+            <option value="72" selected>3日間（72時間）</option>
+            <option value="168">7日間</option>
+            <option value="336">14日間</option>
+            <option value="720">30日間</option>
+          </select>
+          <p class="field-hint">※ 同じ共有URL・QRコードのまま利用できます（ロック済みの場合はロックも解除されます）。</p>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close-modal="modal-extend-box">キャンセル</button>
+          <button type="submit" id="btn-confirm-extend-box" class="btn btn-primary">有効期限を延長する</button>
+        </div>
+      </form>
     </div>
   </div>
 

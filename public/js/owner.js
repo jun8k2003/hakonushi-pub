@@ -7,6 +7,7 @@ window.HakonushiOwner = (function () {
   var selectedFiles = [];
   var isSubmitting = false;
   var pendingDeleteBox = null;
+  var pendingExtendBox = null;
 
   function init() {
     var btnCreateSend = document.getElementById('btn-create-send');
@@ -14,6 +15,7 @@ window.HakonushiOwner = (function () {
     var btnRefresh = document.getElementById('btn-refresh-boxes');
     var btnGenPasscode = document.getElementById('btn-gen-passcode');
     var formCreate = document.getElementById('form-create-box');
+    var formExtend = document.getElementById('form-extend-box');
     var btnCopyUrl = document.getElementById('btn-copy-share-url');
     var checkConfirmDelete = document.getElementById('checkbox-confirm-delete');
     var btnConfirmDelete = document.getElementById('btn-confirm-delete-box');
@@ -42,6 +44,9 @@ window.HakonushiOwner = (function () {
     }
     if (formCreate) {
       formCreate.addEventListener('submit', handleCreateSubmit);
+    }
+    if (formExtend) {
+      formExtend.addEventListener('submit', handleConfirmExtendBox);
     }
     if (btnCopyUrl) {
       btnCopyUrl.addEventListener('click', handleCopyShareUrl);
@@ -208,6 +213,8 @@ window.HakonushiOwner = (function () {
     var st = statusMap[box.status] || { label: box.status, cls: 'pill-disabled' };
     var files = box.files || [];
 
+    var canExtend = isActive || box.direction === 'RECEIVE' || box.status === 'LOCKED';
+
     card.innerHTML =
       '<div class="box-card-top">' +
         '<div class="box-title-group">' +
@@ -220,6 +227,7 @@ window.HakonushiOwner = (function () {
         '</div>' +
         '<div class="box-actions">' +
           (isActive ? '<button type="button" class="btn btn-primary btn-sm" data-action="share">共有URL・QR</button>' : '') +
+          (canExtend ? '<button type="button" class="btn btn-ghost btn-sm" data-action="extend">' + (isActive ? '期限延長' : '再開・延長') + '</button>' : '') +
           '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-files">ファイル (' + files.length + ')</button>' +
           (box.folder_url ? '<a class="btn btn-ghost btn-sm" href="' + api.escapeHtml(box.folder_url) + '" target="_blank" rel="noopener noreferrer">Driveで開く</a>' : '') +
           (isActive ? '<button type="button" class="btn btn-ghost btn-sm" data-action="disable">無効化</button>' : '') +
@@ -237,6 +245,13 @@ window.HakonushiOwner = (function () {
     if (btnShare) {
       btnShare.addEventListener('click', function () {
         openShareModal(box, null);
+      });
+    }
+
+    var btnExtend = card.querySelector('[data-action="extend"]');
+    if (btnExtend) {
+      btnExtend.addEventListener('click', function () {
+        openExtendModal(box);
       });
     }
 
@@ -343,6 +358,46 @@ window.HakonushiOwner = (function () {
       await loadBoxes();
     } catch (err) {
       window.HakonushiApi.showToast(err.message || '箱の無効化に失敗しました。', 'error', 5000);
+    }
+  }
+
+  function openExtendModal(box) {
+    pendingExtendBox = box;
+    var modal = document.getElementById('modal-extend-box');
+    var nameEl = document.getElementById('extend-box-name');
+    var currentEl = document.getElementById('extend-box-current');
+    var selectEl = document.getElementById('input-extend-expires');
+
+    var dirLabel = box.direction === 'SEND' ? '箱主→ゲスト' : '箱主←ゲスト';
+    if (nameEl) nameEl.textContent = box.box_name || box.box_id;
+    if (currentEl) {
+      currentEl.textContent = dirLabel + ' ・ 現在の期限: ' + window.HakonushiApi.formatDateTime(box.expires_at);
+    }
+    if (selectEl) selectEl.value = '72';
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  async function handleConfirmExtendBox(e) {
+    e.preventDefault();
+    if (!pendingExtendBox) return;
+    var targetBox = pendingExtendBox;
+    var selectEl = document.getElementById('input-extend-expires');
+    var submitBtn = document.getElementById('btn-confirm-extend-box');
+    var expiresHours = Number((selectEl && selectEl.value) || 72);
+
+    try {
+      var idToken = await window.HakonushiAuth.getIdToken();
+      await window.HakonushiApi.callGas(
+        'extendBox',
+        { idToken: idToken, boxId: targetBox.box_id, expiresHours: expiresHours },
+        { loadingText: '有効期限を延長中...', triggerButton: submitBtn }
+      );
+      document.getElementById('modal-extend-box').classList.add('hidden');
+      pendingExtendBox = null;
+      window.HakonushiApi.showToast('箱の有効期限を延長しました。', 'success');
+      await loadBoxes();
+    } catch (err) {
+      window.HakonushiApi.showToast(err.message || '有効期限の延長に失敗しました。', 'error', 5500);
     }
   }
 
