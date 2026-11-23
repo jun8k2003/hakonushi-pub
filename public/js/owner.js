@@ -568,17 +568,9 @@ window.HakonushiOwner = (function () {
     if (nameEl) nameEl.textContent = box.box_name || box.box_id;
     if (urlInput) urlInput.value = shareUrl;
 
-    // 外部APIへURLを送らずブラウザ内でQRコードをローカル生成する
+    // 外部APIへURLを送らずブラウザ内でQRコードをローカル生成（タップでPNG保存）
     if (qrContainer) {
-      qrContainer.innerHTML = '';
-      if (typeof window.qrcode === 'function') {
-        var qr = window.qrcode(0, 'M');
-        qr.addData(shareUrl);
-        qr.make();
-        qrContainer.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
-      } else {
-        qrContainer.textContent = 'QRコードライブラリの読み込みに失敗しました。URLを直接コピーしてください。';
-      }
+      window.HakonushiApi.renderClickableQrCode(qrContainer, shareUrl, box.box_name || box.box_id);
     }
 
     if (noticeBox) {

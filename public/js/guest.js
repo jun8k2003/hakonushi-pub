@@ -229,7 +229,7 @@ window.HakonushiGuest = (function () {
       sendSection.classList.remove('hidden');
       receiveSection.classList.add('hidden');
       renderSendFiles(files);
-      renderGuestQrCode(box.box_id);
+      renderGuestQrCode(box.box_id, box.box_name);
     } else {
       if (badgeEl) {
         badgeEl.className = 'pill pill-receive';
@@ -248,20 +248,10 @@ window.HakonushiGuest = (function () {
     return window.location.origin + window.location.pathname + '#box=' + encodeURIComponent(boxId);
   }
 
-  function renderGuestQrCode(boxId) {
+  function renderGuestQrCode(boxId, boxName) {
     var qrContainer = document.getElementById('guest-send-qr-container');
     if (!qrContainer) return;
-    qrContainer.innerHTML = '';
-
-    var shareUrl = buildCurrentBoxShareUrl(boxId);
-    if (typeof window.qrcode === 'function') {
-      var qr = window.qrcode(0, 'M');
-      qr.addData(shareUrl);
-      qr.make();
-      qrContainer.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
-    } else {
-      qrContainer.textContent = 'QRコードを表示できませんでした。URLコピーをご利用ください。';
-    }
+    window.HakonushiApi.renderClickableQrCode(qrContainer, buildCurrentBoxShareUrl(boxId), boxName || boxId);
   }
 
   async function handleCopyCurrentBoxUrl() {

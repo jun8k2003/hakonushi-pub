@@ -452,6 +452,83 @@ window.HakonushiApi = (function () {
       .replace(/'/g, '&#39;');
   }
 
+  /**
+   * QRコードをローカル生成して描画し、タップ/クリックでPNG画像を保存できるようにする
+   * @param {HTMLElement} container
+   * @param {string} targetUrl
+   * @param {string=} fileLabel ファイル名用の箱名など
+   */
+  function renderClickableQrCode(container, targetUrl, fileLabel) {
+    if (!container) return;
+    container.innerHTML = '';
+    container.classList.remove('qr-clickable');
+    container.onclick = null;
+    container.onkeydown = null;
+    container.removeAttribute('role');
+    container.removeAttribute('tabindex');
+    container.removeAttribute('title');
+
+    if (typeof window.qrcode !== 'function') {
+      container.textContent = 'QRコードを表示できませんでした。URLコピーをご利用ください。';
+      return;
+    }
+
+    var qr = window.qrcode(0, 'M');
+    qr.addData(targetUrl);
+    qr.make();
+    container.innerHTML =
+      qr.createSvgTag({ scalable: true, margin: 2 }) +
+      '<span class="qr-tap-hint">タップしてQR画像を保存</span>';
+
+    var downloadPng = function () {
+      var moduleCount = qr.getModuleCount();
+      var marginModules = 4;
+      var totalModules = moduleCount + marginModules * 2;
+      var cellSize = Math.max(8, Math.floor(400 / totalModules));
+      var size = totalModules * cellSize;
+
+      var canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = '#000000';
+      for (var r = 0; r < moduleCount; r++) {
+        for (var c = 0; c < moduleCount; c++) {
+          if (qr.isDark(r, c)) {
+            ctx.fillRect((c + marginModules) * cellSize, (r + marginModules) * cellSize, cellSize, cellSize);
+          }
+        }
+      }
+
+      var safeName = String(fileLabel || 'box')
+        .replace(/[\\/:*?"<>|\s]+/g, '_')
+        .slice(0, 40) || 'box';
+      var dataUrl = canvas.toDataURL('image/png');
+      var a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'hakonushi-qr-' + safeName + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      showToast('QRコード画像を保存しました。', 'success');
+    };
+
+    container.classList.add('qr-clickable');
+    container.setAttribute('role', 'button');
+    container.setAttribute('tabindex', '0');
+    container.setAttribute('title', 'タップしてQRコード画像を保存');
+    container.onclick = downloadPng;
+    container.onkeydown = function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        downloadPng();
+      }
+    };
+  }
+
   return {
     showLoading: showLoading,
     hideLoading: hideLoading,
@@ -459,6 +536,7 @@ window.HakonushiApi = (function () {
     callGas: callGas,
     uploadFileDirectPut: uploadFileDirectPut,
     triggerBrowserDownload: triggerBrowserDownload,
+    renderClickableQrCode: renderClickableQrCode,
     formatFileSize: formatFileSize,
     formatDateTime: formatDateTime,
     escapeHtml: escapeHtml,
