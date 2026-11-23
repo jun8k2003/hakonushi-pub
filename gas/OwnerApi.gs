@@ -228,7 +228,7 @@ function handleExtendBox(owner, payload) {
     if (!isFolderAlive(box.folder_id)) {
       throw createAppError(
         'FOLDER_TRASHED',
-        'この箱のフォルダはゴミ箱に入っている（または削除済みの）ため、有効期限を延長できません。'
+        'この箱はすでに削除されているため、有効期限を延長できません。'
       );
     }
 
@@ -362,7 +362,7 @@ function assertOwnedActiveBox_(ownerEmail, boxId) {
     throw createAppError('BOX_EXPIRED', 'この箱は有効期限を過ぎています。');
   }
   if (!isFolderAlive(box.folder_id)) {
-    throw createAppError('DRIVE_ERROR', 'Google Drive上の箱フォルダが見つかりません。');
+    throw createAppError('DRIVE_ERROR', '対象の箱が見つかりません。');
   }
   return box;
 }

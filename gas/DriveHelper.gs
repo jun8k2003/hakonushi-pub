@@ -177,7 +177,7 @@ function verifyUploadedDriveFile(fileId, expectedFolderId) {
   try {
     file = DriveApp.getFileById(safeId);
   } catch (e) {
-    throw createAppError('FILE_NOT_FOUND', 'Google Drive上にアップロード済みファイルが見つかりません。');
+    throw createAppError('FILE_NOT_FOUND', 'アップロード済みファイルが見つかりません。');
   }
 
   if (file.isTrashed()) {
@@ -193,7 +193,7 @@ function verifyUploadedDriveFile(fileId, expectedFolderId) {
     }
   }
   if (!matched) {
-    throw createAppError('FORBIDDEN', 'ファイルがこの箱のフォルダに属していません。');
+    throw createAppError('FORBIDDEN', 'ファイルがこの箱に属していません。');
   }
 
   return {

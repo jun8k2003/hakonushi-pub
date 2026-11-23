@@ -270,7 +270,7 @@ window.HakonushiApi = (function () {
       };
 
       xhr.onerror = function () {
-        reject({ transient: true, message: 'Google Driveへの直接アップロード中にネットワークエラーが発生しました。' });
+        reject({ transient: true, message: 'アップロード中にネットワークエラーが発生しました。' });
       };
 
       xhr.onabort = function () {
@@ -305,7 +305,7 @@ window.HakonushiApi = (function () {
         if (typeof onProgress === 'function') onProgress(100);
         var emptyParsed = JSON.parse(emptyRes.responseText);
         if (!emptyParsed || !emptyParsed.id) {
-          throw new Error('Google DriveからのファイルID取得に失敗しました。');
+          throw new Error('アップロード結果の取得に失敗しました。');
         }
         return emptyParsed;
       }
@@ -335,10 +335,10 @@ window.HakonushiApi = (function () {
           try {
             parsed = JSON.parse(res.responseText);
           } catch (e) {
-            throw new Error('Google Driveのアップロード応答の解析に失敗しました。');
+            throw new Error('アップロード応答の解析に失敗しました。');
           }
           if (!parsed || !parsed.id) {
-            throw new Error('Google DriveからのファイルID取得に失敗しました。');
+            throw new Error('アップロード結果の取得に失敗しました。');
           }
           return parsed;
         }

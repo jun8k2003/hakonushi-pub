@@ -339,7 +339,7 @@ window.HakonushiOwner = (function () {
   }
 
   async function handleDisableBox(box, triggerButton) {
-    var msg = '「' + (box.box_name || box.box_id) + '」を無効化しますか？\n以降ゲストからはアクセスできなくなりますが、Google Drive 上のファイルはそのまま残ります（あとから再開・延長できます）。';
+    var msg = '「' + (box.box_name || box.box_id) + '」を無効化しますか？\n以降ゲストからはアクセスできなくなりますが、箱とファイルはそのまま残ります（あとから再開・延長できます）。';
 
     if (!window.confirm(msg)) return;
 
@@ -428,7 +428,7 @@ window.HakonushiOwner = (function () {
       );
       document.getElementById('modal-delete-box').classList.add('hidden');
       pendingDeleteBox = null;
-      window.HakonushiApi.showToast('箱を削除し、Driveフォルダをゴミ箱へ移動しました。', 'success');
+      window.HakonushiApi.showToast('箱を削除しました。', 'success');
       await loadBoxes();
     } catch (err) {
       window.HakonushiApi.showToast(err.message || '箱の削除に失敗しました。', 'error', 5500);
