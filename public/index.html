@@ -145,10 +145,23 @@
           </div>
 
           <!-- SEND箱（ダウンロード） -->
-          <div id="guest-send-section" class="card hidden">
-            <h2 class="section-title">ファイル一覧</h2>
-            <p class="muted text-sm">ダウンロードしたいファイルのボタンを押してください。</p>
-            <div id="guest-send-files" class="file-list"></div>
+          <div id="guest-send-section" class="stack-lg hidden">
+            <div class="card">
+              <h2 class="section-title">ファイル一覧</h2>
+              <p class="muted text-sm">ダウンロードしたいファイルのボタンを押してください。</p>
+              <div id="guest-send-files" class="file-list"></div>
+            </div>
+
+            <div class="card guest-qr-card">
+              <h2 class="section-title">他の端末で開く（QRコード）</h2>
+              <p class="muted text-xs">
+                別のスマホやPCでこの箱を開きたいときに読み取ってください（※パスコードはQRコードに含まれません）。
+              </p>
+              <div id="guest-send-qr-container" class="qr-container qr-compact" aria-label="この箱のQRコード"></div>
+              <div class="guest-qr-actions">
+                <button type="button" id="btn-guest-copy-url" class="btn btn-ghost btn-sm">URLをコピー</button>
+              </div>
+            </div>
           </div>
 
           <!-- RECEIVE箱（アップロード＋投稿済み一覧・取消） -->

@@ -3,6 +3,22 @@
  */
 
 /**
+ * 指定メールアドレスが GAS 実行者（Drive オーナー）本人か判定する
+ * @param {string} email
+ * @return {boolean}
+ */
+function isDriveOwnerEmail_(email) {
+  var target = String(email || '').trim().toLowerCase();
+  if (!target) return false;
+  try {
+    var effective = String(Session.getEffectiveUser().getEmail() || '').trim().toLowerCase();
+    return Boolean(effective && effective === target);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * 箱主の箱一覧を取得する
  * @param {{ email: string, displayName: string }} owner
  */
@@ -10,6 +26,7 @@ function handleListBoxes(owner) {
   var boxes = findBoxesByOwner(owner.email);
   var allFiles = findAllFiles();
   var nowMs = new Date().getTime();
+  var isDriveOwner = isDriveOwnerEmail_(owner.email);
 
   var filesByBox = {};
   for (var i = 0; i < allFiles.length; i++) {
@@ -36,7 +53,7 @@ function handleListBoxes(owner) {
       fail_count: box.fail_count,
       expires_at: box.expires_at,
       created_at: box.created_at,
-      folder_url: box.folder_id ? getDriveFolderUrl(box.folder_id) : '',
+      folder_url: (isDriveOwner && box.folder_id) ? getDriveFolderUrl(box.folder_id) : '',
       files: boxFiles
     };
   });
@@ -100,7 +117,7 @@ function handleCreateBox(owner, payload) {
       fail_count: 0,
       expires_at: record.expires_at,
       created_at: record.created_at,
-      folder_url: getDriveFolderUrl(record.folder_id),
+      folder_url: isDriveOwnerEmail_(owner.email) ? getDriveFolderUrl(record.folder_id) : '',
       files: []
     }
   };

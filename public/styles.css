@@ -840,6 +840,32 @@ body {
   display: block;
 }
 
+.guest-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.guest-qr-card p {
+  margin: 0;
+}
+
+.qr-container.qr-compact {
+  padding: 10px;
+}
+
+.qr-container.qr-compact svg {
+  width: 168px;
+  height: 168px;
+}
+
+.guest-qr-actions {
+  display: flex;
+  justify-content: center;
+}
+
 .notice-box {
   padding: 12px;
   border-radius: var(--radius-sm);

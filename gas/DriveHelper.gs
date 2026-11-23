@@ -272,7 +272,9 @@ function createGuestDownloadUrlUnlocked_(fileId, boxId) {
   registerTempSharedFileUnlocked_(fileId, boxId);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-  return 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(fileId);
+  // スマホでGoogleドライブアプリに横取り（アカウント選択・MP4直接再生）されないよう
+  // ファイル配信専用ドメイン drive.usercontent.google.com を返す
+  return 'https://drive.usercontent.google.com/download?id=' + encodeURIComponent(fileId) + '&export=download&confirm=t';
 }
 
 /**

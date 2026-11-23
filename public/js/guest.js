@@ -14,6 +14,7 @@ window.HakonushiGuest = (function () {
     var formUpload = document.getElementById('form-guest-upload');
     var btnBack = document.getElementById('btn-guest-back-entry');
     var btnRefresh = document.getElementById('btn-guest-refresh');
+    var btnCopyUrl = document.getElementById('btn-guest-copy-url');
 
     if (formPasscode) {
       formPasscode.addEventListener('submit', handlePasscodeSubmit);
@@ -32,6 +33,9 @@ window.HakonushiGuest = (function () {
           verifyAndRender(currentBoxId, currentPasscode, btnRefresh);
         }
       });
+    }
+    if (btnCopyUrl) {
+      btnCopyUrl.addEventListener('click', handleCopyCurrentBoxUrl);
     }
 
     setupDropzone();
@@ -225,6 +229,7 @@ window.HakonushiGuest = (function () {
       sendSection.classList.remove('hidden');
       receiveSection.classList.add('hidden');
       renderSendFiles(files);
+      renderGuestQrCode(box.box_id);
     } else {
       if (badgeEl) {
         badgeEl.className = 'pill pill-receive';
@@ -237,6 +242,46 @@ window.HakonushiGuest = (function () {
     }
 
     if (panel) panel.classList.remove('hidden');
+  }
+
+  function buildCurrentBoxShareUrl(boxId) {
+    return window.location.origin + window.location.pathname + '#box=' + encodeURIComponent(boxId);
+  }
+
+  function renderGuestQrCode(boxId) {
+    var qrContainer = document.getElementById('guest-send-qr-container');
+    if (!qrContainer) return;
+    qrContainer.innerHTML = '';
+
+    var shareUrl = buildCurrentBoxShareUrl(boxId);
+    if (typeof window.qrcode === 'function') {
+      var qr = window.qrcode(0, 'M');
+      qr.addData(shareUrl);
+      qr.make();
+      qrContainer.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
+    } else {
+      qrContainer.textContent = 'QRコードを表示できませんでした。URLコピーをご利用ください。';
+    }
+  }
+
+  async function handleCopyCurrentBoxUrl() {
+    if (!currentBoxId) return;
+    var url = buildCurrentBoxShareUrl(currentBoxId);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        var tmp = document.createElement('input');
+        tmp.value = url;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand('copy');
+        document.body.removeChild(tmp);
+      }
+      window.HakonushiApi.showToast('この箱のURLをコピーしました。', 'success');
+    } catch (e) {
+      window.HakonushiApi.showToast('URLのコピーに失敗しました。', 'error');
+    }
   }
 
   function renderSendFiles(files) {
