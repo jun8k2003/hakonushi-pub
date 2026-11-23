@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hakonushi（箱主）— 通信アーキテクチャ &amp; 運用フロー解説</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-2: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --owner: #2563eb;
+      --owner-soft: #eff6ff;
+      --guest: #0f766e;
+      --guest-soft: #f0fdfa;
+      --firebase: #d97706;
+      --firebase-soft: #fffbeb;
+      --gas: #7c3aed;
+      --gas-soft: #f5f3ff;
+      --drive: #16a34a;
+      --drive-soft: #f0fdf4;
+      --danger: #dc2626;
+      --radius: 14px;
+      --shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+      line-height: 1.65;
+    }
+
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
+
+    .brand-tag {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--owner-soft);
+      color: var(--owner);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .nav-link:hover {
+      background: var(--surface-2);
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 20px 72px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .hero {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: 1.85rem;
+      line-height: 1.3;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.96rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-title {
+      margin: 0 0 6px;
+      font-size: 1.2rem;
+    }
+
+    .card-sub {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* Tabs */
+    .scenario-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      border-color: var(--owner);
+    }
+
+    .tab-btn.active {
+      background: var(--owner);
+      color: #ffffff;
+      border-color: var(--owner);
+    }
+
+    /* Interactive Diagram Grid */
+    .sim-layout {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .diagram-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      overflow-x: auto;
+    }
+
+    .diagram-svg {
+      width: 100%;
+      min-width: 520px;
+      height: auto;
+      display: block;
+    }
+
+    .node-rect {
+      transition: filter 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .node-active .node-rect {
+      stroke-width: 3.5;
+      filter: drop-shadow(0 4px 10px rgba(37, 99, 235, 0.28));
+    }
+
+    .edge-line {
+      stroke: #cbd5e1;
+      stroke-width: 2;
+      fill: none;
+      transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+      opacity: 0.45;
+    }
+
+    .edge-line.in-scenario {
+      stroke: #94a3b8;
+      opacity: 0.75;
+    }
+
+    .edge-line.active {
+      stroke: #2563eb;
+      stroke-width: 3.5;
+      opacity: 1;
+      stroke-dasharray: 8 5;
+      animation: dashFlow 0.9s linear infinite;
+    }
+
+    .edge-line.active-drive {
+      stroke: #16a34a;
+    }
+
+    .edge-line.active-firebase {
+      stroke: #d97706;
+    }
+
+    .edge-line.active-gas {
+      stroke: #7c3aed;
+    }
+
+    @keyframes dashFlow {
+      to { stroke-dashoffset: -26; }
+    }
+
+    .edge-label-bg {
+      fill: #ffffff;
+      stroke: var(--border);
+      stroke-width: 1;
+      rx: 6;
+    }
+
+    .edge-label-text {
+      font-size: 11px;
+      font-weight: 700;
+      fill: #334155;
+      text-anchor: middle;
+    }
+
+    /* Controls & Step Panel */
+    .step-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--surface-2);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--owner);
+      border-color: var(--owner);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #1d4ed8;
+    }
+
+    .step-counter {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .step-detail {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      background: #ffffff;
+      margin-bottom: 12px;
+    }
+
+    .step-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-bottom: 6px;
+    }
+
+    .badge-owner { background: var(--owner-soft); color: var(--owner); }
+    .badge-guest { background: var(--guest-soft); color: var(--guest); }
+    .badge-firebase { background: var(--firebase-soft); color: var(--firebase); }
+    .badge-gas { background: var(--gas-soft); color: var(--gas); }
+    .badge-drive { background: var(--drive-soft); color: var(--drive); }
+
+    .step-detail h3 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+    }
+
+    .step-detail p {
+      margin: 0 0 10px;
+      font-size: 0.88rem;
+      color: #334155;
+    }
+
+    .code-box {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.77rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .step-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .step-item {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.84rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .step-item:hover {
+      background: var(--surface-2);
+    }
+
+    .step-item.active {
+      border-color: var(--owner);
+      background: var(--owner-soft);
+      font-weight: 700;
+    }
+
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .step-item.active .step-num {
+      background: var(--owner);
+      color: #ffffff;
+    }
+
+    /* Role & Flow Cards */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .mini-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      background: #fcfdff;
+    }
+
+    .mini-card h3 {
+      margin: 6px 0 6px;
+      font-size: 0.98rem;
+    }
+
+    .mini-card p, .mini-card li {
+      font-size: 0.86rem;
+      color: #334155;
+    }
+
+    .mini-card ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+    }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--surface-2);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    code {
+      background: var(--surface-2);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.83em;
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .sim-layout {
+        grid-template-columns: 1fr;
+      }
+      .grid-3, .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <span>📦 hakonushi（箱主）</span>
+        <span class="brand-tag">通信アーキテクチャ &amp; 運用フロー</span>
+      </div>
+      <nav class="nav-links">
+        <a class="nav-link" href="./index.html">設計ガイド・画面モックを見る</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>サービス間の通信と運用フローが一目でわかるガイド</h1>
+      <p>
+        箱主（ブラウザ）・ゲスト（ブラウザ）・Firebase・Google Apps Script（Sheets）・Google Drive の5者が、
+        どのように通信し、どうやって「ゲストログイン不要」と「15 GB 大容量転送」「安全性」を両立しているかをインタラクティブに確認できます。
+      </p>
+    </section>
+
+    <!-- 1. インタラクティブ通信シミュレーター -->
+    <section class="card" aria-label="通信フローシミュレーター">
+      <h2 class="card-title">1. サービス間通信フロー（ステップ解説）</h2>
+      <p class="card-sub">
+        シナリオを選び、「次へ」またはステップ一覧をクリックすると、実際に発生する通信経路とセキュリティ検証の内容がハイライトされます。
+      </p>
+
+      <div class="scenario-tabs" role="tablist">
+        <button type="button" class="tab-btn active" data-scenario="auth">① 箱主ログイン</button>
+        <button type="button" class="tab-btn" data-scenario="send">② 箱主→ゲスト（あげる箱）</button>
+        <button type="button" class="tab-btn" data-scenario="receive">③ 箱主←ゲスト（もらう箱）</button>
+        <button type="button" class="tab-btn" data-scenario="cleanup">④ 定期お掃除 &amp; 削除</button>
+      </div>
+
+      <div class="sim-layout">
+        <!-- SVG アーキテクチャ図 -->
+        <div class="diagram-box">
+          <svg class="diagram-svg" viewBox="0 0 660 410" role="img" aria-label="hakonushi システム通信構成図">
+            <defs>
+              <marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8"></path>
+              </marker>
+              <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb"></path>
+              </marker>
+              <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#d97706"></path>
+              </marker>
+              <marker id="arrow-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#7c3aed"></path>
+              </marker>
+              <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#16a34a"></path>
+              </marker>
+            </defs>
+
+            <!-- 通信エッジ -->
+            <!-- owner <-> firebase -->
+            <path id="edge-owner-firebase" class="edge-line" d="M 185 80 L 265 80" marker-end="url(#arrow-gray)" />
+            <!-- owner -> gas -->
+            <path id="edge-owner-gas" class="edge-line" d="M 185 110 C 260 155, 340 165, 445 190" marker-end="url(#arrow-gray)" />
+            <!-- owner <-> drive -->
+            <path id="edge-owner-drive" class="edge-line" d="M 185 125 C 245 250, 345 310, 445 335" marker-end="url(#arrow-gray)" />
+            <!-- guest -> firebase (hosting) -->
+            <path id="edge-guest-firebase" class="edge-line" d="M 185 295 C 235 235, 275 170, 310 120" marker-end="url(#arrow-gray)" />
+            <!-- guest -> gas -->
+            <path id="edge-guest-gas" class="edge-line" d="M 185 310 C 275 275, 355 245, 445 225" marker-end="url(#arrow-gray)" />
+            <!-- guest <-> drive -->
+            <path id="edge-guest-drive" class="edge-line" d="M 185 340 L 445 355" marker-end="url(#arrow-gray)" />
+            <!-- gas -> firebase (accounts:lookup) -->
+            <path id="edge-gas-firebase" class="edge-line" d="M 480 165 C 445 130, 420 110, 405 100" marker-end="url(#arrow-gray)" />
+            <!-- gas <-> drive -->
+            <path id="edge-gas-drive" class="edge-line" d="M 540 245 L 540 305" marker-end="url(#arrow-gray)" />
+            <!-- owner -> guest (URL/QR) -->
+            <path id="edge-owner-guest" class="edge-line" d="M 100 135 L 100 280" marker-end="url(#arrow-gray)" />
+
+            <!-- ノード: 箱主（ブラウザ） -->
+            <g id="node-owner">
+              <rect class="node-rect" x="20" y="45" width="165" height="90" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2" />
+              <text x="102" y="75" text-anchor="middle" font-size="14" font-weight="800" fill="#1e40af">👤 箱主（ブラウザ）</text>
+              <text x="102" y="97" text-anchor="middle" font-size="11" fill="#334155">owner@example.com</text>
+              <text x="102" y="116" text-anchor="middle" font-size="10.5" fill="#64748b">Googleログイン必須</text>
+            </g>
+
+            <!-- ノード: ゲスト（ブラウザ） -->
+            <g id="node-guest">
+              <rect class="node-rect" x="20" y="280" width="165" height="90" rx="12" fill="#f0fdfa" stroke="#0f766e" stroke-width="2" />
+              <text x="102" y="310" text-anchor="middle" font-size="14" font-weight="800" fill="#115e59">👥 ゲスト（ブラウザ）</text>
+              <text x="102" y="332" text-anchor="middle" font-size="11" fill="#334155">ログイン不要</text>
+              <text x="102" y="351" text-anchor="middle" font-size="10.5" fill="#64748b">#box=&lt;GUID&gt; + 任意6桁</text>
+            </g>
+
+            <!-- ノード: Firebase -->
+            <g id="node-firebase">
+              <rect class="node-rect" x="265" y="35" width="150" height="85" rx="12" fill="#fffbeb" stroke="#d97706" stroke-width="2" />
+              <text x="340" y="65" text-anchor="middle" font-size="14" font-weight="800" fill="#92400e">🔥 Firebase</text>
+              <text x="340" y="86" text-anchor="middle" font-size="11" fill="#334155">Hosting（静的配信）</text>
+              <text x="340" y="103" text-anchor="middle" font-size="11" fill="#334155">Auth（Google認証）</text>
+            </g>
+
+            <!-- ノード: GAS + Sheets -->
+            <g id="node-gas">
+              <rect class="node-rect" x="445" y="165" width="190" height="80" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2" />
+              <text x="540" y="193" text-anchor="middle" font-size="14" font-weight="800" fill="#5b21b6">⚙️ GAS + Sheets</text>
+              <text x="540" y="213" text-anchor="middle" font-size="11" fill="#334155">doPost API / LockService</text>
+              <text x="540" y="230" text-anchor="middle" font-size="10.5" fill="#64748b">boxes・files / 毎時トリガー</text>
+            </g>
+
+            <!-- ノード: Google Drive -->
+            <g id="node-drive">
+              <rect class="node-rect" x="445" y="305" width="190" height="80" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2" />
+              <text x="540" y="333" text-anchor="middle" font-size="14" font-weight="800" fill="#166534">💾 Google Drive</text>
+              <text x="540" y="353" text-anchor="middle" font-size="11" fill="#334155">Resumable Upload (16MB)</text>
+              <text x="540" y="370" text-anchor="middle" font-size="10.5" fill="#64748b">実ファイル保管・一時権限</text>
+            </g>
+
+            <!-- アクティブ通信ラベル -->
+            <g id="active-edge-badge" transform="translate(330, 396)">
+              <rect x="-155" y="-14" width="310" height="22" rx="11" fill="#0f172a" />
+              <text id="active-edge-caption" x="0" y="1" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff"></text>
+            </g>
+          </svg>
+        </div>
+
+        <!-- ステップ操作 & 詳細 -->
+        <div>
+          <div class="step-controls">
+            <div>
+              <button type="button" id="btn-prev" class="btn">← 前へ</button>
+              <button type="button" id="btn-next" class="btn btn-primary">次へ →</button>
+            </div>
+            <span id="step-counter" class="step-counter">1 / 4</span>
+          </div>
+
+          <div id="step-detail" class="step-detail"></div>
+          <ul id="step-list" class="step-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 運用フロー -->
+    <section class="card">
+      <h2 class="card-title">2. 運用フロー（初期構築 〜 日常運用 〜 メンテナンス）</h2>
+      <p class="card-sub">
+        サーバー常時稼働やDB保守が不要なため、一度配置すればほぼメンテナンスフリーで運用できます。
+      </p>
+
+      <div class="grid-3">
+        <div class="mini-card">
+          <span class="step-badge badge-firebase">Phase A：初回配置</span>
+          <h3>無料枠だけでセルフホスト構築</h3>
+          <ul>
+            <li>Google Drive に専用フォルダと管理スプレッドシートを作成。</li>
+            <li>GAS に <code>copy_gas_to_clipboard.bat</code> でコードを貼り付け、Drive API v3 を有効化。</li>
+            <li>スクリプトプロパティ（<code>ALLOWED_EMAILS</code>, <code>FIREBASE_API_KEY</code>, <code>ALLOWED_ORIGINS</code>）を登録し、<code>setupDatabase()</code> を1回実行。</li>
+            <li>毎時トリガー（<code>cleanupExpiredBoxes</code>）を設定し、Firebase Hosting へデプロイ。</li>
+          </ul>
+        </div>
+
+        <div class="mini-card">
+          <span class="step-badge badge-owner">Phase B：日常の受け渡し</span>
+          <h3>箱をつくって鍵（URL/QR）を渡す</h3>
+          <ul>
+            <li><strong>渡すとき（箱主→ゲスト）</strong>: 箱名・有効期限（30分〜30日）・任意6桁パスコードを設定してファイルをアップロード → URL/QR を共有。</li>
+            <li><strong>もらうとき（箱主←ゲスト）</strong>: 空の箱を作成して URL/QR を共有 → ゲストが未ログインのまま動画（最大15 GB）を送信。</li>
+            <li><strong>管理</strong>: 受け取ったファイルはアプリから非公開のまま個別 DL、または Drive フォルダを直接開いて一括管理。</li>
+          </ul>
+        </div>
+
+        <div class="mini-card">
+          <span class="step-badge badge-drive">Phase C：自動お掃除 &amp; 更新</span>
+          <h3>放置しても自動で安全側へ閉じる</h3>
+          <ul>
+            <li><strong>期限切れ自動処理</strong>: 1時間おきトリガーで期限超過箱を <code>EXPIRED</code> 化。<code>SEND</code> 箱はゴミ箱へ移動、<code>RECEIVE</code> 箱の受取ファイルは保持。</li>
+            <li><strong>一時共有の自動回収</strong>: ゲスト DL から6時間猶予経過後、<code>Drive.Permissions.remove()</code> で <code>anyone</code> 権限を確実に削除（失敗時は次回再試行）。</li>
+            <li><strong>完全削除</strong>: 不要になった箱は念押し確認モーダルから Drive フォルダごと完全削除して空き容量を回収。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 通信経路とセキュリティ境界の早見表 -->
+    <section class="card">
+      <h2 class="card-title">3. 通信経路とセキュリティ境界の早見表</h2>
+      <p class="card-sub">
+        「誰が・どのサービスへ・どんな制約で通信するか」を整理した一覧です。ファイル本体は GAS を経由せずブラウザと Google Drive が直接やり取りします。
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>通信経路</th>
+              <th>プロトコル / 方式</th>
+              <th>認証・検証</th>
+              <th>主なセキュリティ対策</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ブラウザ → Firebase Hosting</td>
+              <td>HTTPS GET（静的配信）</td>
+              <td>不要（公開静的ファイル）</td>
+              <td>厳格な CSP・<code>X-Frame-Options: DENY</code>・<code>Referrer-Policy: no-referrer</code>・外部 CDN 依存ゼロ</td>
+            </tr>
+            <tr>
+              <td>箱主 → Firebase Auth</td>
+              <td>Google OAuth ポップアップ</td>
+              <td>Google アカウント</td>
+              <td>ID トークンを発行（未確認アプリ警告なし）</td>
+            </tr>
+            <tr>
+              <td>箱主 → GAS (<code>doPost</code>)</td>
+              <td>HTTPS POST (<code>text/plain</code>)</td>
+              <td>ID トークン ＋ <code>ALLOWED_EMAILS</code></td>
+              <td><code>accounts:lookup</code> 検証・<code>disabled</code> 拒否・<code>google.com</code> 確認・トークン認証で CSRF 耐性</td>
+            </tr>
+            <tr>
+              <td>ゲスト → GAS (<code>doPost</code>)</td>
+              <td>HTTPS POST (<code>text/plain</code>)</td>
+              <td><code>box_id</code> (UUID v4) ＋ 任意6桁</td>
+              <td>HMAC-SHA256（ソルト＋ペッパー）・ロック内直列化・5回失敗で即 <code>LOCKED</code>・数式インジェクション対策</td>
+            </tr>
+            <tr>
+              <td>ブラウザ → Google Drive（送信）</td>
+              <td>HTTPS PUT（16 MB チャンク分割）</td>
+              <td>GAS 発行の一時 Resumable URI</td>
+              <td><code>ALLOWED_ORIGINS</code> 完全一致検証・<code>X-Upload-Content-Length</code> 物理制限・完了時に実サイズ＆親フォルダ検証</td>
+            </tr>
+            <tr>
+              <td>ブラウザ ← Google Drive（取得）</td>
+              <td>HTTPS GET（ブラウザ標準 DL）</td>
+              <td>箱主：非公開/本人限定<br>ゲスト：一時 <code>anyone</code>（<code>SEND</code> のみ）</td>
+              <td><code>RECEIVE</code> 箱はゲスト DL 不可・一時公開は Write-Ahead 記録＋6時間後自動削除（無効化/ロック時は即削除）</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer">
+      hakonushi（箱主）— Self-hosted lightweight file transfer powered by Google Drive, GAS &amp; Firebase.
+    </footer>
+  </main>
+
+  <script>
+    (function () {
+      var SCENARIOS = {
+        auth: {
+          steps: [
+            {
+              badge: 'Firebase Hosting',
+              badgeClass: 'badge-firebase',
+              title: '1. アプリ画面の取得（静的ファイル配信）',
+              desc: '箱主がブラウザでアクセスすると、Firebase Hosting から HTML/CSS/JS（Firebase SDK や QR ライブラリもローカル同梱済み）が配信されます。',
+              edge: 'edge-owner-firebase',
+              edgeColor: 'active-firebase',
+              nodes: ['node-owner', 'node-firebase'],
+              caption: '箱主 ⇄ Firebase Hosting（静的アセット取得）',
+              code: 'GET https://<YourHakonushiApp>.web.app/\nResponse Headers: Content-Security-Policy, X-Frame-Options: DENY, Referrer-Policy: no-referrer'
+            },
+            {
+              badge: 'Firebase Auth',
+              badgeClass: 'badge-firebase',
+              title: '2. Google ログインと ID トークン取得',
+              desc: '「Googleアカウントでログイン」を押すと Firebase Auth 経由で Google 認証が行われ、箱主ブラウザへ短期の Firebase ID トークンが発行されます。',
+              edge: 'edge-owner-firebase',
+              edgeColor: 'active-firebase',
+              nodes: ['node-owner', 'node-firebase'],
+              caption: '箱主 ⇄ Firebase Auth（Googleログイン → IDトークン）',
+              code: 'firebase.auth().signInWithPopup(GoogleAuthProvider)\n→ idToken = await user.getIdToken(true)'
+            },
+            {
+              badge: 'GAS 認証検証',
+              badgeClass: 'badge-gas',
+              title: '3. GAS が Firebase へ ID トークンを照会・許可リスト確認',
+              desc: '箱主ブラウザが Content-Type: text/plain で JSON を GAS へ送信。GAS は Firebase REST API (accounts:lookup) でトークンを検証し、無効化アカウント拒否・google.com 確認・ALLOWED_EMAILS 一致をチェックします。',
+              edge: 'edge-gas-firebase',
+              edgeColor: 'active-gas',
+              nodes: ['node-owner', 'node-gas', 'node-firebase'],
+              caption: 'GAS → Firebase accounts:lookup（本人検証）',
+              code: 'POST https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=FIREBASE_API_KEY\nCheck: !user.disabled && provider==="google.com" && emailVerified && ALLOWED_EMAILS.includes(email)'
+            },
+            {
+              badge: 'GAS + Sheets',
+              badgeClass: 'badge-gas',
+              title: '4. 自分の箱一覧をスプレッドシートから取得',
+              desc: '認証を通過すると、GAS は openById() で管理スプレッドシート（boxes / files）を読み込み、ログイン中の箱主メールアドレスに紐づく箱一覧を返却します。',
+              edge: 'edge-owner-gas',
+              edgeColor: 'active-gas',
+              nodes: ['node-owner', 'node-gas'],
+              caption: '箱主 ⇄ GAS（listBoxes → 箱一覧表示）',
+              code: 'POST /exec { action: "listBoxes", idToken }\n→ { ok: true, data: { boxes: [...] } }'
+            }
+          ]
+        },
+        send: {
+          steps: [
+            {
+              badge: '箱作成',
+              badgeClass: 'badge-owner',
+              title: '1. 箱主→ゲスト（SEND）箱の作成',
+              desc: '箱主が箱名（未入力時は日時自動設定）・有効期限（30分〜30日）・任意6桁パスコードを指定。GAS が Drive に {owner_email}/{box_id}/ フォルダを作成し、boxes シートへ記録します（パスコードは HMAC-SHA256 保存）。',
+              edge: 'edge-owner-gas',
+              edgeColor: 'active-gas',
+              nodes: ['node-owner', 'node-gas', 'node-drive'],
+              caption: '箱主 → GAS → Drive（箱フォルダ作成 & DB登録）',
+              code: 'POST /exec { action: "createBox", direction: "SEND", boxName, expiresHours, passcode }\nDrive: root/owner@example.com/<box_id>/'
+            },
+            {
+              badge: 'Resumable Upload',
+              badgeClass: 'badge-drive',
+              title: '2. セッション発行 → ブラウザから Drive へ 16 MB チャンク直接 PUT',
+              desc: 'GAS が ALLOWED_ORIGINS 検証のうえ Drive API v3 から一時アップロード URI を発行。ファイル本体は GAS を通さず、ブラウザから Google Drive へ 16 MB ずつ直接 PUT します（自動リトライ・Wake Lock 対応）。',
+              edge: 'edge-owner-drive',
+              edgeColor: 'active-drive',
+              nodes: ['node-owner', 'node-drive'],
+              caption: '箱主 → Google Drive（16 MB チャンク直接 PUT）',
+              code: 'PUT <resumable_upload_uri>\nContent-Range: bytes 0-16777215/<total> → 308 Resume Incomplete → 最終 200 OK { id }\nPOST /exec { action: "completeUpload", boxId, fileId }'
+            },
+            {
+              badge: '鍵の共有',
+              badgeClass: 'badge-owner',
+              title: '3. フラグメントURL & ローカルQRコードをゲストへ渡す',
+              desc: '箱主のブラウザ内で QR コードをローカル生成（外部 API 不使用）。#box=<GUID> 形式のためサーバーログや Referer に箱 ID が漏れません。パスコードは別経路で伝えます。',
+              edge: 'edge-owner-guest',
+              edgeColor: '',
+              nodes: ['node-owner', 'node-guest'],
+              caption: '箱主 → ゲスト（#box=<GUID> URL / ローカルQR共有）',
+              code: 'https://<YourHakonushiApp>.web.app/#box=550e8400-e29b-41d4-a716-446655440000\n（※パスコードはURL・QRに含めない）'
+            },
+            {
+              badge: 'ゲスト検証',
+              badgeClass: 'badge-guest',
+              title: '4. ゲストがログイン不要で箱を開く（パスコード検証）',
+              desc: 'ゲストが URL を開くと verifyBox を送信。パスコード設定時はロック内で照合〜失敗回数更新を直列化し、5回連続失敗で即 LOCKED になります。通過後に箱名とファイル一覧を表示します。',
+              edge: 'edge-guest-gas',
+              edgeColor: 'active-gas',
+              nodes: ['node-guest', 'node-gas'],
+              caption: 'ゲスト ⇄ GAS（verifyBox：パスコード検証 & 一覧取得）',
+              code: 'POST /exec { action: "verifyBox", boxId, passcode }\nLockService: 状態確認 → HMAC-SHA256 照合 → 5回失敗で LOCKED'
+            },
+            {
+              badge: '一時公開 & DL',
+              badgeClass: 'badge-drive',
+              title: '5. ダウンロード押下時のみ一時公開 → ブラウザ標準 DL',
+              desc: 'ゲストが DL ボタンを押すと、GAS はロック内で先に解除予定（6時間後）を記録（Write-Ahead）してから対象ファイルに一時的な anyone 権限を付与し、Drive 直リンクを返します。ブラウザ標準ダウンローダーが直接保存します。',
+              edge: 'edge-guest-drive',
+              edgeColor: 'active-drive',
+              nodes: ['node-guest', 'node-gas', 'node-drive'],
+              caption: 'ゲスト ← Google Drive（ブラウザ標準ダウンロード）',
+              code: '1) Write-Ahead: TEMP_SHARED_FILES_JSON へ解除予定(6h後)を記録\n2) file.setSharing(ANYONE_WITH_LINK, VIEW)\n3) GET https://drive.google.com/uc?export=download&id=<file_id>'
+            }
+          ]
+        },
+        receive: {
+          steps: [
+            {
+              badge: '空の箱を作成',
+              badgeClass: 'badge-owner',
+              title: '1. 箱主が「箱主←ゲスト（RECEIVE）」の空箱を作成し共有',
+              desc: '箱主が空の箱を作成して #box=<GUID> URL や QR コードをゲストへ渡します。ゲスト側は Google ログイン不要です。',
+              edge: 'edge-owner-guest',
+              edgeColor: '',
+              nodes: ['node-owner', 'node-gas', 'node-guest'],
+              caption: '箱主 → GAS（空箱作成）→ ゲストへ URL/QR 共有',
+              code: 'POST /exec { action: "createBox", direction: "RECEIVE", boxName, expiresHours, passcode }'
+            },
+            {
+              badge: '上限チェック',
+              badgeClass: 'badge-gas',
+              title: '2. ゲストが上限検証を通過してアップロードセッションを取得',
+              desc: 'ゲストが動画等を選択すると GAS が 1ファイル最大 15 GB・1箱最大 50 件・合計最大 50 GB・ALLOWED_ORIGINS を検証し、Drive API の一時アップロード URI を発行します。',
+              edge: 'edge-guest-gas',
+              edgeColor: 'active-gas',
+              nodes: ['node-guest', 'node-gas', 'node-drive'],
+              caption: 'ゲスト → GAS（容量/件数/Origin 検証 → URI 発行）',
+              code: 'POST /exec { action: "initGuestUploadSession", boxId, passcode, fileSize, origin }\nCheck: fileSize <= 15GB && files < 50 && total <= 50GB'
+            },
+            {
+              badge: '16 MB チャンク送信',
+              badgeClass: 'badge-drive',
+              title: '3. ブラウザから Drive へ 16 MB チャンク直接 PUT → 完了検証',
+              desc: '15 GB クラスの大容量動画でも 16 MB ずつ直接 Drive へ PUT。完了 API で GAS が Drive 上の実サイズ・親フォルダ一致・重複 file_id を再検証し、サニタイズして files シートへ記録します。',
+              edge: 'edge-guest-drive',
+              edgeColor: 'active-drive',
+              nodes: ['node-guest', 'node-drive', 'node-gas'],
+              caption: 'ゲスト → Google Drive（16 MB 直接 PUT）→ GAS 完了確定',
+              code: 'PUT <resumable_upload_uri> (16MB chunks, auto-retry x5)\nPOST /exec { action: "completeGuestUpload", boxId, fileId, uploaderName }'
+            },
+            {
+              badge: '誤送信取消（DL不可）',
+              badgeClass: 'badge-guest',
+              title: '4. ゲストは投稿一覧の確認と「取り消す」のみ可能（DL不可）',
+              desc: 'RECEIVE 箱ではゲストからのダウンロード API を完全に拒否。誤送信したファイルは「取り消す」で論理削除（DELETED）＋ Drive ゴミ箱移動ができます。',
+              edge: 'edge-guest-gas',
+              edgeColor: 'active-gas',
+              nodes: ['node-guest', 'node-gas', 'node-drive'],
+              caption: 'ゲスト → GAS（deleteGuestFile：論理削除＋ゴミ箱移動）',
+              code: 'POST /exec { action: "deleteGuestFile", boxId, passcode, fileId }\n※ getGuestDownloadUrl は RECEIVE 箱に対し FORBIDDEN を返却'
+            },
+            {
+              badge: '箱主の安全な受取',
+              badgeClass: 'badge-owner',
+              title: '5. 箱主が非公開のままダウンロード（または Drive で直接確認）',
+              desc: '箱主のダウンロードは ANYONE_WITH_LINK を一切使わず、Drive オーナー本人なら非公開のまま、家族箱主なら本人限定共有（addViewer）で安全に取得します。',
+              edge: 'edge-owner-drive',
+              edgeColor: 'active-drive',
+              nodes: ['node-owner', 'node-drive'],
+              caption: '箱主 ← Google Drive（非公開／本人限定共有で安全 DL）',
+              code: 'createOwnerDownloadUrl(fileId, owner.email)\n※ ANYONE_WITH_LINK は絶対に使用しない'
+            }
+          ]
+        },
+        cleanup: {
+          steps: [
+            {
+              badge: '毎時トリガー',
+              badgeClass: 'badge-gas',
+              title: '1. 1時間おきに cleanupExpiredBoxes() が自動起動',
+              desc: 'GAS の時間主導型トリガーが1時間ごとに自動実行されます。一時共有リストが空のときは Drive API を呼ばずにスキップするため、無料枠（90分/日）をほとんど消費しません。',
+              edge: 'edge-gas-drive',
+              edgeColor: 'active-gas',
+              nodes: ['node-gas'],
+              caption: 'GAS 時間主導型トリガー（1時間おき自動実行）',
+              code: 'Trigger: cleanupExpiredBoxes() [Every 1 hour]\nwithScriptLock(() => { ... })'
+            },
+            {
+              badge: '一時共有の自動回収',
+              badgeClass: 'badge-drive',
+              title: '2. 6時間猶予を過ぎた公開権限（anyone）を確実に削除',
+              desc: 'Drive.Permissions.list() で type==="anyone" の権限を特定し、Drive.Permissions.remove() で削除します（箱主個人の閲覧権限は維持）。解除確認できた記録のみ消し、一時エラー時は次回自動再試行します。',
+              edge: 'edge-gas-drive',
+              edgeColor: 'active-drive',
+              nodes: ['node-gas', 'node-drive'],
+              caption: 'GAS → Google Drive（anyone 権限の直接削除）',
+              code: 'Drive.Permissions.list(fileId) → type === "anyone" を Drive.Permissions.remove()\n404時は「解除確認不可」ログ出力、一時エラー時は記録を残し再試行'
+            },
+            {
+              badge: '期限切れ箱の整理',
+              badgeClass: 'badge-gas',
+              title: '3. 期限超過箱を EXPIRED 化（SEND はゴミ箱・RECEIVE は保持）',
+              desc: 'expires_at を過ぎた ACTIVE 箱を EXPIRED に更新し、配下の一時公開権限を即時削除。SEND 箱の Drive フォルダはゴミ箱へ移動し、RECEIVE 箱の受取ファイルは箱主のために保持します。',
+              edge: 'edge-gas-drive',
+              edgeColor: 'active-drive',
+              nodes: ['node-gas', 'node-drive'],
+              caption: 'GAS → Drive（SEND ゴミ箱移動 / RECEIVE 保持）',
+              code: 'if (box.direction === "SEND") trashFolderSafe(box.folder_id);\n// RECEIVE 箱の受取ファイルは自動削除しない'
+            },
+            {
+              badge: '手動完全削除',
+              badgeClass: 'badge-owner',
+              title: '4. 箱主による「完全削除」（念押し確認モーダル付き）',
+              desc: '不要になった箱は箱主ダッシュボードから念押しチェック付きで完全削除可能。Drive.Files.remove() でゴミ箱を経由せずフォルダごと完全削除し、管理シートの行も削除して空き容量を即座に回収します。',
+              edge: 'edge-owner-gas',
+              edgeColor: 'active-gas',
+              nodes: ['node-owner', 'node-gas', 'node-drive'],
+              caption: '箱主 → GAS → Drive（Drive.Files.remove で完全削除）',
+              code: 'POST /exec { action: "deleteBox", idToken, boxId }\n→ Drive.Files.remove(folderId) + deleteFilesByBoxId + deleteBoxByRowIndex'
+            }
+          ]
+        }
+      };
+
+      var currentScenarioKey = 'auth';
+      var currentStepIdx = 0;
+
+      var allEdgeIds = [
+        'edge-owner-firebase', 'edge-owner-gas', 'edge-owner-drive',
+        'edge-guest-firebase', 'edge-guest-gas', 'edge-guest-drive',
+        'edge-gas-firebase', 'edge-gas-drive', 'edge-owner-guest'
+      ];
+      var allNodeIds = ['node-owner', 'node-guest', 'node-firebase', 'node-gas', 'node-drive'];
+
+      function getMarkerForColor(colorClass) {
+        if (colorClass === 'active-drive') return 'url(#arrow-green)';
+        if (colorClass === 'active-firebase') return 'url(#arrow-amber)';
+        if (colorClass === 'active-gas') return 'url(#arrow-violet)';
+        return 'url(#arrow-blue)';
+      }
+
+      function render() {
+        var scenario = SCENARIOS[currentScenarioKey];
+        var steps = scenario.steps;
+        var step = steps[currentStepIdx];
+
+        // Tabs
+        document.querySelectorAll('.tab-btn').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-scenario') === currentScenarioKey);
+        });
+
+        // Counter & buttons
+        document.getElementById('step-counter').textContent = (currentStepIdx + 1) + ' / ' + steps.length;
+        document.getElementById('btn-prev').disabled = currentStepIdx === 0;
+        document.getElementById('btn-next').disabled = currentStepIdx === steps.length - 1;
+
+        // Detail card
+        var detailEl = document.getElementById('step-detail');
+        detailEl.innerHTML = '';
+        var badge = document.createElement('span');
+        badge.className = 'step-badge ' + step.badgeClass;
+        badge.textContent = step.badge;
+
+        var h3 = document.createElement('h3');
+        h3.textContent = step.title;
+
+        var p = document.createElement('p');
+        p.textContent = step.desc;
+
+        var code = document.createElement('div');
+        code.className = 'code-box';
+        code.textContent = step.code;
+
+        detailEl.appendChild(badge);
+        detailEl.appendChild(h3);
+        detailEl.appendChild(p);
+        detailEl.appendChild(code);
+
+        // Step list
+        var listEl = document.getElementById('step-list');
+        listEl.innerHTML = '';
+        steps.forEach(function (s, idx) {
+          var li = document.createElement('li');
+          li.className = 'step-item' + (idx === currentStepIdx ? ' active' : '');
+          var num = document.createElement('span');
+          num.className = 'step-num';
+          num.textContent = String(idx + 1);
+          var label = document.createElement('span');
+          label.textContent = s.title.replace(/^\d+\.\s*/, '');
+          li.appendChild(num);
+          li.appendChild(label);
+          li.addEventListener('click', function () {
+            currentStepIdx = idx;
+            render();
+          });
+          listEl.appendChild(li);
+        });
+
+        // SVG Edges
+        var scenarioEdges = {};
+        steps.forEach(function (s) { scenarioEdges[s.edge] = true; });
+
+        allEdgeIds.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.setAttribute('class', 'edge-line');
+          el.setAttribute('marker-end', 'url(#arrow-gray)');
+          if (scenarioEdges[id]) {
+            el.classList.add('in-scenario');
+          }
+          if (id === step.edge) {
+            el.classList.add('active');
+            if (step.edgeColor) el.classList.add(step.edgeColor);
+            el.setAttribute('marker-end', getMarkerForColor(step.edgeColor));
+          }
+        });
+
+        // SVG Nodes
+        allNodeIds.forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          if (step.nodes.indexOf(id) !== -1) {
+            el.classList.add('node-active');
+          } else {
+            el.classList.remove('node-active');
+          }
+        });
+
+        // Caption
+        document.getElementById('active-edge-caption').textContent = step.caption;
+      }
+
+      document.querySelectorAll('.tab-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          currentScenarioKey = btn.getAttribute('data-scenario');
+          currentStepIdx = 0;
+          render();
+        });
+      });
+
+      document.getElementById('btn-prev').addEventListener('click', function () {
+        if (currentStepIdx > 0) {
+          currentStepIdx--;
+          render();
+        }
+      });
+
+      document.getElementById('btn-next').addEventListener('click', function () {
+        var steps = SCENARIOS[currentScenarioKey].steps;
+        if (currentStepIdx < steps.length - 1) {
+          currentStepIdx++;
+          render();
+        }
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hakonushi（箱主）システム構成・シーケンス図解</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', '"Noto Sans JP"', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    /* データ通信ラインの破線アニメーション */
+    @keyframes dashFlow {
+      to {
+        stroke-dashoffset: -24;
+      }
+    }
+    .animate-dash {
+      stroke-dasharray: 6 6;
+      animation: dashFlow 0.85s linear infinite;
+    }
+
+    /* パケット移動アニメーション（右向き・左向き） */
+    @keyframes packetMoveRight {
+      0%   { left: 0%;   opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+      15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+      85%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+      100% { left: 100%; opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    }
+    @keyframes packetMoveLeft {
+      0%   { left: 100%; opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+      15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+      85%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+      100% { left: 0%;   opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+    }
+    .packet-right {
+      animation: packetMoveRight 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    .packet-left {
+      animation: packetMoveLeft 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    /* スクロールバーの微調整 */
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- ヘッダー -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <!-- ブランドロゴ＆タイトル -->
+      <div class="flex items-start sm:items-center gap-3.5">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-500 to-amber-500 text-white flex items-center justify-center shadow-md shrink-0">
+          <!-- 箱（Box）モチーフアイコン -->
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">hakonushi（箱主）</h1>
+            <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+              最新アーキテクチャ仕様図解
+            </span>
+            <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              複数ファイル・2シートDB対応
+            </span>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Firebase Hosting + Auth ＋ コンテナバインドGAS ＋ Google Sheets DB（boxes / files）＋ Google Drive
+          </p>
+        </div>
+      </div>
+
+      <!-- 表示切替（シーケンス図タブ時のみ有効）＋ 通信解説リンク -->
+      <div class="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+        <a href="./architecture.html" class="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all">
+          通信・運用フロー解説 →
+        </a>
+        <div id="viewModeWrapper" class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <button id="btnViewDiagram" onclick="setViewMode('diagram')" class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-white text-indigo-700 shadow-sm">
+            シーケンス図ビュー
+          </button>
+          <button id="btnViewList" onclick="setViewMode('list')" class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900">
+            全ステップ一覧
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- 上部3モード切替タブ ＆ ステップ送りコントロール -->
+    <section class="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <!-- 3つのメインタブ -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1" role="tablist">
+        <!-- タブ1: あげるフロー（SEND） -->
+        <button id="mainTab-SEND" onclick="selectMainTab('SEND')" class="text-left px-3.5 py-3 rounded-xl border-2 transition-all flex items-center gap-3">
+          <div id="mainTabIcon-SEND" class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <div class="text-xs sm:text-sm font-bold truncate">あげるフロー（SEND）</div>
+            <div class="text-[11px] opacity-80 truncate">箱主 → ゲスト（複数ファイル配布）</div>
+          </div>
+        </button>
+
+        <!-- タブ2: もらうフロー（RECEIVE） -->
+        <button id="mainTab-RECEIVE" onclick="selectMainTab('RECEIVE')" class="text-left px-3.5 py-3 rounded-xl border-2 transition-all flex items-center gap-3">
+          <div id="mainTabIcon-RECEIVE" class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <div class="text-xs sm:text-sm font-bold truncate">もらうフロー（RECEIVE）</div>
+            <div class="text-[11px] opacity-80 truncate">複数ゲスト → 箱主（追投・取消可）</div>
+          </div>
+        </button>
+
+        <!-- タブ3: Drive階層 ＆ 2シートDB設計 -->
+        <button id="mainTab-SCHEMA" onclick="selectMainTab('SCHEMA')" class="text-left px-3.5 py-3 rounded-xl border-2 transition-all flex items-center gap-3">
+          <div id="mainTabIcon-SCHEMA" class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <div class="text-xs sm:text-sm font-bold truncate">Drive階層 ＆ 2シートDB設計</div>
+            <div class="text-[11px] opacity-80 truncate">フォルダ構成・スキーマ・OSS設定</div>
+          </div>
+        </button>
+      </div>
+
+      <!-- ステップ送りコントロール（SEND/RECEIVEの図解モード時のみ表示） -->
+      <div id="stepControls" class="flex items-center justify-between sm:justify-end gap-2 pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-100 shrink-0">
+        <span id="stepCounter" class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg mr-1">
+          Step 1 / 9
+        </span>
+        <button id="btnPrev" onclick="prevStep()" class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          前へ
+        </button>
+        <button id="btnNext" onclick="nextStep()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+          次へ
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         パネルA：シーケンス図・全ステップ一覧（SEND / RECEIVE）
+         ========================================== -->
+    <div id="panelFlow" class="space-y-6">
+
+      <!-- 図解ビュー -->
+      <div id="viewDiagram" class="space-y-6">
+        <!-- 6ノード・シーケンス図メインステージ -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-4 sm:px-6 py-3 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span id="stageModeBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">SEND</span>
+              <h2 id="stageModeTitle" class="text-sm font-bold text-slate-800">あげるフロー（箱主 → ゲスト）</h2>
+            </div>
+            <span class="text-[11px] text-slate-400 hidden sm:inline">各ステップをクリック、またはキーボードの ← / → キーで操作できます</span>
+          </div>
+
+          <!-- 横スクロール可能な6レーンキャンバス -->
+          <div class="overflow-x-auto custom-scrollbar">
+            <div class="min-w-[960px] p-4 sm:p-6">
+              <!-- 6ノードヘッダー -->
+              <div id="nodesHeader" class="grid grid-cols-6 gap-2.5 mb-2 relative z-10">
+                <!-- JSで描画 -->
+              </div>
+
+              <!-- ライフライン＋ステップ矢印エリア -->
+              <div class="relative pt-3 pb-2">
+                <!-- 背景の6本の縦ライフライン -->
+                <div class="absolute inset-0 grid grid-cols-6 gap-2.5 pointer-events-none">
+                  <div class="flex justify-center"><div class="w-0.5 h-full border-l-2 border-dashed border-indigo-200/80"></div></div>
+                  <div class="flex justify-center"><div class="w-0.5 h-full border-l-2 border-dashed border-amber-200/80"></div></div>
+                  <div class="flex justify-center"><div class="w-0.5 h-full border-l-2 border-dashed border-violet-200/80"></div></div>
+                  <div class="flex justify-center"><div class="w-0.5 h-full border-l-2 border-dashed border-emerald-200/80"></div></div>
+                  <div class="flex justify-center"><div class="w-0.5 h-full border-l-2 border-dashed border-sky-200/80"></div></div>
+                  <div class="flex justify-center"><div class="w-0.5 h-full border-l-2 border-dashed border-rose-200/80"></div></div>
+                </div>
+
+                <!-- ステップ行コンテナ -->
+                <div id="sequenceRows" class="relative z-10 space-y-2">
+                  <!-- JSで描画 -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 下部詳細解説カード -->
+        <section id="detailCard" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all">
+          <!-- JSで描画 -->
+        </section>
+
+        <!-- ステップ クイックジャンプ -->
+        <section class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">ステップ クイックジャンプ（全9ステップ）</h3>
+            <span class="text-xs text-slate-400">クリックで直接移動</span>
+          </div>
+          <div id="quickNav" class="flex flex-wrap gap-2">
+            <!-- JSで描画 -->
+          </div>
+        </section>
+      </div>
+
+      <!-- 全ステップ一覧ビュー -->
+      <div id="viewList" class="hidden space-y-5">
+        <div class="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 id="listHeading" class="text-base font-bold text-indigo-950">あげるフロー（SEND）全9ステップ一覧</h2>
+            <p class="text-xs sm:text-sm text-indigo-900/80 mt-0.5">
+              各カードをクリックすると、シーケンス図ビューの該当ステップへ直接ジャンプします。
+            </p>
+          </div>
+          <button onclick="setViewMode('diagram')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-all self-start sm:self-center shrink-0">
+            シーケンス図ビューに戻る
+          </button>
+        </div>
+
+        <div id="allStepsContainer" class="grid grid-cols-1 gap-3.5">
+          <!-- JSで描画 -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         パネルB：Drive階層 ＆ 2シートDB設計（タブ3）
+         ========================================== -->
+    <div id="panelSchema" class="hidden space-y-6">
+
+      <!-- 1. Google Drive フォルダ階層ツリー ＆ 相対パス解決の仕組み -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 bg-gradient-to-r from-indigo-50/80 to-amber-50/60 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800">Google Drive 構成</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900 mt-1">格納ルート〜箱フォルダ階層と相対解決（ID設定不要）</h2>
+          </div>
+          <span class="text-xs font-semibold text-amber-800 bg-amber-100/80 px-3 py-1 rounded-lg border border-amber-200 self-start sm:self-center">
+            フォルダごと移動しても壊れない設計
+          </span>
+        </div>
+
+        <div class="p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- 左側：視覚的フォルダツリー -->
+          <div class="lg:col-span-7 bg-slate-900 text-slate-100 rounded-2xl p-5 font-mono text-xs sm:text-sm overflow-x-auto custom-scrollbar space-y-2.5 shadow-inner">
+            <div class="text-slate-400 text-[11px] font-sans font-semibold uppercase tracking-wider mb-3 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              Google Drive（マイドライブ内）
+            </div>
+
+            <!-- ルートフォルダ -->
+            <div class="flex items-center gap-2 text-amber-300 font-bold">
+              <span>📁</span>
+              <span>hakonushi/</span>
+              <span class="text-[11px] font-sans font-normal text-slate-400">← 格納ルートフォルダ（任意のフォルダ名でOK）</span>
+            </div>
+
+            <!-- 第1階層：管理用スプレッドシート（コンテナバインドGAS） -->
+            <div class="pl-5 border-l border-slate-700 ml-2 space-y-2.5">
+              <div class="bg-emerald-950/70 border border-emerald-700/60 rounded-xl p-2.5 flex flex-wrap items-center gap-2">
+                <span class="text-emerald-400 font-bold">📊 hakonushi_db.gsheet</span>
+                <span class="px-2 py-0.5 rounded bg-violet-600/80 text-white text-[10px] font-sans font-bold">⚡ コンテナバインドGAS内包</span>
+                <span class="text-[11px] font-sans text-emerald-200/90 w-full sm:w-auto">
+                  親フォルダ（hakonushi/）を ssFile.getParents().next() で相対取得
+                </span>
+              </div>
+
+              <!-- 第1階層：メールアドレス別サブフォルダ1 -->
+              <div class="space-y-2">
+                <div class="flex items-center gap-2 text-sky-300 font-bold">
+                  <span>📁</span>
+                  <span>taro@example.com/</span>
+                  <span class="text-[11px] font-sans font-normal text-slate-400">← 箱主のメアドごとに自動生成</span>
+                </div>
+
+                <!-- 第2階層：箱フォルダ1（SEND） -->
+                <div class="pl-5 border-l border-slate-700 ml-2 space-y-2">
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2 text-indigo-300 font-semibold">
+                      <span>📦</span>
+                      <span>550e8400-e29b-41d4-.../</span>
+                      <span class="px-1.5 py-0.5 rounded bg-indigo-900 text-indigo-200 text-[10px] font-sans">SEND 箱フォルダ</span>
+                    </div>
+                    <div class="pl-5 border-l border-slate-700/80 ml-2 mt-1.5 space-y-1 text-slate-300 text-xs">
+                      <div class="flex items-center gap-2"><span>📄</span> <span>プレゼン資料.pdf</span> <span class="text-slate-500">(4.2 MB)</span></div>
+                      <div class="flex items-center gap-2"><span>🎬</span> <span>デモ動画.mp4</span> <span class="text-slate-500">(185 MB)</span></div>
+                    </div>
+                  </div>
+
+                  <!-- 第2階層：箱フォルダ2（RECEIVE） -->
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2 text-amber-200 font-semibold">
+                      <span>📦</span>
+                      <span>9b1deb4d-3b7d-4bad-.../</span>
+                      <span class="px-1.5 py-0.5 rounded bg-amber-900/80 text-amber-200 text-[10px] font-sans">RECEIVE 箱フォルダ</span>
+                    </div>
+                    <div class="pl-5 border-l border-slate-700/80 ml-2 mt-1.5 space-y-1 text-slate-300 text-xs">
+                      <div class="flex items-center gap-2"><span>🖼️</span> <span>IMG_0001.JPG</span> <span class="text-slate-500">(投稿者: 佐藤)</span></div>
+                      <div class="flex items-center gap-2"><span>🖼️</span> <span>IMG_0001.JPG</span> <span class="text-slate-500">(投稿者: 鈴木 / file_idで区別)</span></div>
+                      <div class="flex items-center gap-2 text-slate-500 line-through"><span>🖼️</span> <span>誤送信.png</span> <span class="no-underline text-rose-400">(Driveゴミ箱へ移動済・復元可)</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 第1階層：メールアドレス別サブフォルダ2 -->
+              <div class="flex items-center gap-2 text-sky-300/80">
+                <span>📁</span>
+                <span>hanako@example.com/</span>
+                <span class="text-[11px] font-sans text-slate-500">← 他の家族メンバー用（画面上はお互いに見えない）</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右側：設計メリット＆運用ルール -->
+          <div class="lg:col-span-5 space-y-4">
+            <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-4 space-y-2">
+              <h3 class="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                <svg class="w-4 h-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                コンテナバインドGASによる相対解決
+              </h3>
+              <p class="text-xs sm:text-sm text-indigo-950/80 leading-relaxed">
+                スプレッドシート自身にGASを紐づけることで、<code class="px-1.5 py-0.5 bg-white rounded border border-indigo-200 text-xs">SPREADSHEET_ID</code> と <code class="px-1.5 py-0.5 bg-white rounded border border-indigo-200 text-xs">ROOT_FOLDER_ID</code> の手動設定が一切不要になります。ルートフォルダごと別階層へ移動しても動作し続けます。
+              </p>
+            </div>
+
+            <div class="bg-amber-50/70 border border-amber-200/80 rounded-xl p-4 space-y-2">
+              <h3 class="text-sm font-bold text-amber-950 flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                箱フォルダ（{box_id}）を切るメリット
+              </h3>
+              <ul class="text-xs sm:text-sm text-amber-950/85 space-y-1.5 list-disc pl-4">
+                <li><strong>一括共有終了:</strong> Drive上で箱フォルダごとゴミ箱へ移すだけで、中の複数ファイルをまとめて無効化できます。</li>
+                <li><strong>一括ダウンロード:</strong> 「もらう箱」で集めた写真を、箱主はDrive上でフォルダごとZIP一括ダウンロードできます。</li>
+                <li><strong>同名衝突の回避:</strong> Driveは同一フォルダ内の同名ファイルを別 <code class="text-xs">file_id</code> として保持するため上書きされません。</li>
+              </ul>
+            </div>
+
+            <div class="bg-rose-50/70 border border-rose-200/80 rounded-xl p-4 space-y-1.5">
+              <h3 class="text-xs sm:text-sm font-bold text-rose-900">配置時の注意ルール</h3>
+              <p class="text-xs text-rose-900/80 leading-relaxed">
+                管理用スプレッドシートは<strong>マイドライブ直下に置かず</strong>、必ず専用ルートフォルダ（例：<code class="px-1 bg-white rounded">hakonushi</code>）の中に配置してください。またスプレッドシート単体を別フォルダへ移動しない運用にします。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Google Sheets 2シートDB設計 ＆ リレーション図 -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 bg-slate-50/90 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">Google Sheets DB（2シート正規化）</span>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900 mt-1">boxes シート ＆ files シート（1対多リレーション）</h2>
+          </div>
+          <span class="text-xs font-semibold text-slate-600 bg-white px-3 py-1 rounded-lg border border-slate-200 self-start sm:self-center">
+            書き込み時は必ず LockService.getScriptLock() で排他制御
+          </span>
+        </div>
+
+        <div class="p-5 sm:p-6 space-y-6">
+          <!-- 1対多リレーション可視化バナー -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-center gap-4">
+            <div class="bg-white border-2 border-indigo-400 rounded-xl px-4 py-3 shadow-sm w-full md:w-64 text-center">
+              <div class="text-xs font-bold text-indigo-600">親シート（1）</div>
+              <div class="text-base font-bold text-slate-900 font-mono">boxes</div>
+              <div class="text-[11px] text-slate-500 mt-1">PK: <code class="bg-indigo-50 text-indigo-700 px-1 rounded font-bold">box_id</code></div>
+            </div>
+
+            <div class="flex flex-col items-center justify-center text-indigo-600 shrink-0">
+              <span class="text-[11px] font-bold bg-indigo-100 px-2.5 py-0.5 rounded-full mb-1">1 対 多（box_id で紐づけ）</span>
+              <div class="flex items-center gap-1 font-mono text-xs font-bold">
+                <span>1</span>
+                <span class="w-12 sm:w-20 h-0.5 bg-indigo-400 inline-block"></span>
+                <span>0..N</span>
+              </div>
+            </div>
+
+            <div class="bg-white border-2 border-amber-400 rounded-xl px-4 py-3 shadow-sm w-full md:w-64 text-center">
+              <div class="text-xs font-bold text-amber-700">子シート（多）</div>
+              <div class="text-base font-bold text-slate-900 font-mono">files</div>
+              <div class="text-[11px] text-slate-500 mt-1">PK: <code class="bg-amber-50 text-amber-800 px-1 rounded font-bold">file_id</code> / FK: <code class="bg-indigo-50 text-indigo-700 px-1 rounded font-bold">box_id</code></div>
+            </div>
+          </div>
+
+          <!-- 2つのスキーマ表（並列/縦積みレスポンシブ） -->
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <!-- boxes シート -->
+            <div class="border border-slate-200 rounded-2xl overflow-hidden">
+              <div class="bg-indigo-600 text-white px-4 py-2.5 flex items-center justify-between">
+                <span class="font-mono font-bold text-sm">boxes シート（箱の管理）</span>
+                <span class="text-[11px] bg-white/20 px-2 py-0.5 rounded-full">9カラム</span>
+              </div>
+              <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500">
+                      <th class="py-2.5 px-3 font-bold">列名</th>
+                      <th class="py-2.5 px-3 font-bold">型 / 値</th>
+                      <th class="py-2.5 px-3 font-bold">役割・仕様</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    <tr><td class="py-2 px-3 font-mono font-bold text-indigo-700">box_id</td><td class="py-2 px-3">UUID v4</td><td class="py-2 px-3">主キー。URLパラメータ <code class="bg-slate-100 px-1 rounded">?box=</code> に使用</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">owner_email</td><td class="py-2 px-3">String</td><td class="py-2 px-3">箱主のGoogleメアド。一覧表示の絞込キー</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">direction</td><td class="py-2 px-3">SEND / RECEIVE</td><td class="py-2 px-3">あげる箱（SEND）か、もらう箱（RECEIVE）か</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">status</td><td class="py-2 px-3">Enum</td><td class="py-2 px-3"><code class="bg-emerald-50 text-emerald-700 px-1 rounded">ACTIVE</code> / <code class="bg-slate-100 px-1 rounded">DISABLED</code> / <code class="bg-rose-50 text-rose-700 px-1 rounded">LOCKED</code> / <code class="bg-amber-50 text-amber-800 px-1 rounded">EXPIRED</code></td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">folder_id</td><td class="py-2 px-3">Drive ID</td><td class="py-2 px-3">Google Drive上の箱フォルダ（<code class="bg-slate-100 px-1 rounded">{box_id}</code>）のID</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">passcode_hash</td><td class="py-2 px-3">SHA-256</td><td class="py-2 px-3">任意6桁パスコードのハッシュ値（未設定時は空欄）</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">fail_count</td><td class="py-2 px-3">Number</td><td class="py-2 px-3">パスコード連続失敗回数（5回で <code class="bg-rose-50 text-rose-700 px-1 rounded">LOCKED</code>）</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">expires_at</td><td class="py-2 px-3">ISO 8601</td><td class="py-2 px-3">有効期限。超過後はアクセス拒否＆トリガー掃除対象</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">created_at</td><td class="py-2 px-3">ISO 8601</td><td class="py-2 px-3">箱の作成日時</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- files シート -->
+            <div class="border border-slate-200 rounded-2xl overflow-hidden">
+              <div class="bg-amber-600 text-white px-4 py-2.5 flex items-center justify-between">
+                <span class="font-mono font-bold text-sm">files シート（箱内の複数ファイル管理）</span>
+                <span class="text-[11px] bg-white/20 px-2 py-0.5 rounded-full">8カラム</span>
+              </div>
+              <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-500">
+                      <th class="py-2.5 px-3 font-bold">列名</th>
+                      <th class="py-2.5 px-3 font-bold">型 / 値</th>
+                      <th class="py-2.5 px-3 font-bold">役割・仕様</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100">
+                    <tr><td class="py-2 px-3 font-mono font-bold text-amber-800">file_id</td><td class="py-2 px-3">Drive ID</td><td class="py-2 px-3">主キー。Google Drive上のファイル実体ID</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold text-indigo-700">box_id</td><td class="py-2 px-3">UUID v4</td><td class="py-2 px-3">外部キー。<code class="bg-slate-100 px-1 rounded">boxes.box_id</code> と1対多で紐づけ</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">file_name</td><td class="py-2 px-3">String</td><td class="py-2 px-3">元のファイル名（一覧表示用メタデータ）</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">file_size</td><td class="py-2 px-3">Number</td><td class="py-2 px-3">バイト数（サイズ表示・DL方式の判定に利用）</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">mime_type</td><td class="py-2 px-3">String</td><td class="py-2 px-3">MIMEタイプ（画像・PDF・動画等のアイコン表示）</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">uploader_name</td><td class="py-2 px-3">String</td><td class="py-2 px-3">任意の投稿者メモ（複数人からの写真集め等で活用）</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">status</td><td class="py-2 px-3">ACTIVE / DELETED</td><td class="py-2 px-3">ゲスト取消時は <code class="bg-rose-50 text-rose-700 px-1 rounded">DELETED</code> に論理削除＋Driveゴミ箱移動</td></tr>
+                    <tr><td class="py-2 px-3 font-mono font-bold">uploaded_at</td><td class="py-2 px-3">ISO 8601</td><td class="py-2 px-3">アップロード完了日時</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. OSS公開向け 外出し設定一覧 -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 bg-slate-50/90 border-b border-slate-200">
+          <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-white">セルフホストOSS設計</span>
+          <h2 class="text-base sm:text-lg font-bold text-slate-900 mt-1">環境依存値・秘密情報の外出し設定一覧（.gitignore対象）</h2>
+        </div>
+
+        <div class="p-5 sm:p-6 overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-[640px]">
+            <thead>
+              <tr class="border-b-2 border-slate-200 text-slate-600 bg-slate-50">
+                <th class="py-3 px-4 rounded-tl-xl">領域</th>
+                <th class="py-3 px-4">設定キー / 項目</th>
+                <th class="py-3 px-4">保存先（推奨）</th>
+                <th class="py-3 px-4 rounded-tr-xl">OSSリポジトリの扱い</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <tr>
+                <td class="py-3 px-4 font-bold text-violet-800">GAS バックエンド</td>
+                <td class="py-3 px-4 font-mono text-xs">ALLOWED_EMAILS<br>FIREBASE_API_KEY</td>
+                <td class="py-3 px-4">GAS スクリプトプロパティ<br><span class="text-xs text-slate-500">（ROOT_FOLDER_ID / SPREADSHEET_IDは相対解決のため不要）</span></td>
+                <td class="py-3 px-4 text-xs text-slate-600">コードに含めない（READMEにGUI登録手順を記載）</td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-bold text-indigo-800">フロントエンド</td>
+                <td class="py-3 px-4 font-mono text-xs">firebaseConfig (apiKey 等)<br>GAS_EXEC_URL</td>
+                <td class="py-3 px-4 font-mono text-xs">public/config.js</td>
+                <td class="py-3 px-4 text-xs text-slate-600"><code class="bg-slate-100 px-1 rounded">.gitignore</code> 対象。代わりに <code class="bg-slate-100 px-1 rounded">config.example.js</code> を同梱</td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-bold text-amber-800">CLI デプロイ設定</td>
+                <td class="py-3 px-4 font-mono text-xs">Firebase Project ID<br>clasp scriptId</td>
+                <td class="py-3 px-4 font-mono text-xs">.firebaserc / .clasp.json</td>
+                <td class="py-3 px-4 text-xs text-slate-600"><code class="bg-slate-100 px-1 rounded">.gitignore</code> 対象。代わりに <code class="bg-slate-100 px-1 rounded">*.example</code> を同梱</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+  </main>
+
+  <!-- フッター -->
+  <footer class="border-t border-slate-200 bg-white mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+      <div>hakonushi（箱主）— Firebase Hosting + Auth + コンテナバインドGAS + Google Sheets + Drive</div>
+      <div>※ 複数ファイル対応・2シートDB構成・セルフホストOSS仕様</div>
+    </div>
+  </footer>
+
+  <script>
+    // ==========================================
+    // 6つのシステム構成ノード定義
+    // ==========================================
+    const NODES = [
+      {
+        id: 0,
+        name: '箱主ブラウザ',
+        sub: 'Firebase Hosting SPA',
+        badgeBg: 'bg-indigo-100 text-indigo-800',
+        borderActive: 'border-indigo-500 ring-4 ring-indigo-100 bg-indigo-50/50',
+        borderIdle: 'border-slate-200 bg-white',
+        iconBg: 'bg-indigo-600 text-white',
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>`
+      },
+      {
+        id: 1,
+        name: 'Firebase Auth',
+        sub: 'Googleログイン・検証',
+        badgeBg: 'bg-amber-100 text-amber-800',
+        borderActive: 'border-amber-500 ring-4 ring-amber-100 bg-amber-50/50',
+        borderIdle: 'border-slate-200 bg-white',
+        iconBg: 'bg-amber-500 text-white',
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>`
+      },
+      {
+        id: 2,
+        name: 'コンテナバインドGAS',
+        sub: 'API・5人照合・Drive制御',
+        badgeBg: 'bg-violet-100 text-violet-800',
+        borderActive: 'border-violet-500 ring-4 ring-violet-100 bg-violet-50/50',
+        borderIdle: 'border-slate-200 bg-white',
+        iconBg: 'bg-violet-600 text-white',
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>`
+      },
+      {
+        id: 3,
+        name: 'Google Sheets DB',
+        sub: 'boxes / files 2シート',
+        badgeBg: 'bg-emerald-100 text-emerald-800',
+        borderActive: 'border-emerald-500 ring-4 ring-emerald-100 bg-emerald-50/50',
+        borderIdle: 'border-slate-200 bg-white',
+        iconBg: 'bg-emerald-600 text-white',
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`
+      },
+      {
+        id: 4,
+        name: 'Google Drive',
+        sub: '{owner_email}/{box_id}/',
+        badgeBg: 'bg-sky-100 text-sky-800',
+        borderActive: 'border-sky-500 ring-4 ring-sky-100 bg-sky-50/50',
+        borderIdle: 'border-slate-200 bg-white',
+        iconBg: 'bg-sky-600 text-white',
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>`
+      },
+      {
+        id: 5,
+        name: 'ゲストブラウザ',
+        sub: 'Firebase Hosting・未認証',
+        badgeBg: 'bg-rose-100 text-rose-800',
+        borderActive: 'border-rose-500 ring-4 ring-rose-100 bg-rose-50/50',
+        borderIdle: 'border-slate-200 bg-white',
+        iconBg: 'bg-rose-500 text-white',
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`
+      }
+    ];
+
+    // ==========================================
+    // フローデータ定義（SEND / RECEIVE 各9ステップ）
+    // ==========================================
+    const FLOWS = {
+      SEND: {
+        badge: 'SEND',
+        title: 'あげるフロー（箱主 → ゲスト：複数ファイル配布）',
+        steps: [
+          {
+            code: 'Step 1',
+            title: '箱主ログイン（Firebase AuthでGoogle認証→IDトークン取得）',
+            from: 0,
+            to: 1,
+            via: [],
+            arrowLabel: 'エントリ画面で「箱主」選択 → Google認証（警告なし）→ IDトークン取得',
+            payload: 'signInWithPopup(auth, googleProvider) → user.getIdToken()',
+            summary: '箱主がプレーンなエントリ画面で「箱主」を選択し、Firebase AuthでGoogleログインを実行します。未確認アプリの怖い警告画面は出ず、本人証明となるIDトークンを取得します。',
+            techPoint: 'Firebase Auth SDKがログインセッションを自動維持するため、リロードや再訪時もログイン状態が保たれます。',
+            securityPoint: 'フロントエンドには許可する家族5人のメールアドレスを一切書かず、あくまでFirebaseのIDトークンを取得するだけに留めます。'
+          },
+          {
+            code: 'Step 2',
+            title: '認可検証（GAS doPost → Firebase REST API検証＆5人照合）',
+            from: 2,
+            to: 1,
+            via: [0],
+            arrowLabel: 'POST(text/plain)受信 → accounts:lookup検証＆ALLOWED_EMAILS照合',
+            payload: 'POST /exec (Content-Type: text/plain) → identitytoolkit.../accounts:lookup → email_verified && ALLOWED_EMAILS.includes(email)',
+            summary: '箱主ブラウザから Content-Type: text/plain で送られたIDトークンを、GASがFirebase公式REST API（accounts:lookup）へ問い合わせて検証し、スクリプトプロパティの許可5人リストと照合します。',
+            techPoint: 'GASのdoPostはプリフライト（OPTIONS）に非対応のため、fetch時は必ず Content-Type: text/plain でJSON文字列を送信してCORSエラーを回避します。',
+            securityPoint: '5人限定チェックを完全にサーバーサイド（GAS）で実行するため、フロントエンドのコード解析によるメールアドレス漏洩や認可バイパスを防ぎます。'
+          },
+          {
+            code: 'Step 3',
+            title: '箱の作成（箱フォルダ生成＆boxesシートへ登録）',
+            from: 2,
+            to: 3,
+            via: [4],
+            arrowLabel: 'LockService排他制御 → {owner_email}/{box_id}作成 → boxes行追加',
+            payload: 'Drive: root/{email}/{box_id}/ (folder_id) / Sheet[boxes]: { box_id, owner_email, direction:"SEND", status:"ACTIVE", folder_id, passcode_hash: SHA256, expires_at }',
+            summary: 'LockServiceで排他制御しつつ、親フォルダから相対解決した {owner_email} 配下に箱フォルダ（{box_id}）を自動生成。boxesシートに1行追加し、任意6桁パスコードはSHA-256ハッシュ化して保存します。',
+            techPoint: 'コンテナバインドGAS自身が親フォルダを ssFile.getParents().next() で辿るため、ROOT_FOLDER_ID や SPREADSHEET_ID の手動設定が不要です。',
+            securityPoint: 'パスコードは平文保存せずSHA-256でハッシュ化するため、管理用スプレッドシートを直接開いてもパスコードが露出しません。'
+          },
+          {
+            code: 'Step 4',
+            title: '複数ファイル直接アップロード（Resumable Upload→filesシート記録）',
+            from: 0,
+            to: 4,
+            via: [2, 3],
+            arrowLabel: 'Origin付きセッションURI発行 → Drive箱フォルダへ複数直接PUT → files記録',
+            payload: '1) GAS: POST drive/v3/files?uploadType=resumable (Headers: Origin, parents:[folder_id])  2) Browser: PUT <URI>  3) Sheet[files]: { file_id, box_id, file_name, file_size, status:"ACTIVE" }',
+            summary: '選択された複数ファイルごとに、GASがOriginヘッダ付きでResumable UploadセッションURIを発行。ブラウザからGoogle Driveの箱フォルダへ直接PUTし、完了ごとにfilesシートへメタデータを記録します。',
+            techPoint: 'ファイル本体がGASを一切経由しないため、GASの50MB制限・6分実行制限を完全に回避し、動画などの大容量ファイルも複数まとめて送信できます。',
+            securityPoint: 'ブラウザにはDriveのOAuthトークンを渡さず、1ファイル限定の使い捨てセッションURIのみを返却。格納されたファイルは非公開のまま保持されます。'
+          },
+          {
+            code: 'Step 5',
+            title: '共有URL発行（?box=<GUID> と任意パスコードをゲストへ伝達）',
+            from: 0,
+            to: 5,
+            via: [],
+            arrowLabel: 'LINE・メール等で ?box=<GUID> 共有（必要なら別経路で6桁パスコード）',
+            payload: 'https://<YourHakonushiApp>.web.app/?box=550e8400-e29b-41d4-a716-446655440000',
+            summary: '箱主が発行された共有URLをゲストへ送付します。任意で6桁パスコードを設定した場合は、口頭や別チャットなどの別経路でゲストへ伝えます。',
+            techPoint: 'URLに含めるのはUUID v4の箱ID（GUID）のみ。DriveのフォルダIDや箱主のメールアドレスなどの内部情報は一切含まれません。',
+            securityPoint: 'ゲストはGoogleアカウントへのログイン不要。URLプレビューボットがアクセスしても画面表示のみのため、共有状態は変化しません。'
+          },
+          {
+            code: 'Step 6',
+            title: 'ゲストアクセス＆検証（直リンクまたはGUID入力→期限・状態・削除確認）',
+            from: 5,
+            to: 2,
+            via: [3, 4],
+            arrowLabel: '?box=GUID直リンク（またはエントリ手入力）→ 期限・status・isTrashed()検証',
+            payload: 'POST /exec { action:"getBoxInfo", box_id } → check(status==="ACTIVE", expires_at > now, !folder.isTrashed())',
+            summary: 'ゲストが ?box=<GUID> 直リンクを開く（またはエントリ画面で「ゲスト」→GUID入力）と、GASがboxesシートの有効期限・ステータスと、Drive上の箱フォルダが手動削除（isTrashed）されていないかを確認します。',
+            techPoint: '直リンクの場合はエントリ画面をスキップして直接箱の画面へ遷移。箱フォルダがDrive上でゴミ箱に入っていた場合は、その場でstatusをDISABLEDに更新して共有終了扱いにします。',
+            securityPoint: 'この時点ではまだファイル一覧を返さず、パスコードが設定されている箱であれば入力フォームのみを表示します。'
+          },
+          {
+            code: 'Step 7',
+            title: 'パスコード照合＆ファイル一覧表示（5回連続失敗でLOCKED）',
+            from: 5,
+            to: 2,
+            via: [3],
+            arrowLabel: '6桁パスコード照合（5回失敗でLOCKED）→ filesシートから一覧返却',
+            payload: 'POST /exec { action:"listFiles", box_id, passcode } → fail_count >= 5 ? LOCKED : return files[box_id && ACTIVE]',
+            summary: 'パスコード設定時は6桁の入力値をSHA-256照合（未設定ならスキップ）。5回連続で誤入力すると箱をLOCKED状態にして以降のアクセスを遮断します。認証通過でfilesシートから対象ファイル一覧を表示します。',
+            techPoint: '失敗回数（fail_count）の加算やLOCKED更新時はLockServiceで排他制御し、同時リクエストによるすり抜けを防ぎます。',
+            securityPoint: '6桁数値（100万通り）でも5回ロック機構を組み合わせることで、総当たり攻撃を事実上不可能にしています。'
+          },
+          {
+            code: 'Step 8',
+            title: '個別ダウンロード（対象ファイルのみ一時共有開放→Drive直DL）',
+            from: 4,
+            to: 5,
+            via: [2],
+            arrowLabel: '対象ファイル選択 → 一時的にリンク共有設定 → Drive直ダウンロードURLへ遷移',
+            payload: 'GAS: file.setSharing(ANYONE_WITH_LINK, VIEW) → https://drive.google.com/uc?export=download&id=<file_id>',
+            summary: 'ゲストが一覧から欲しいファイルをクリックすると、GASが対象ファイルのみ一時的に「リンクを知っている全員（閲覧者）」へ設定し、Google Driveの直ダウンロードURLへ遷移させます。',
+            techPoint: 'ZIP一括ダウンロードはGASのUtilities.zip()が50MB上限に当たるため、大容量対応と両立する個別ダウンロード方式を採用しています。',
+            securityPoint: 'ダウンロードボタンが押される瞬間まで全ファイル非公開を維持。箱全体ではなく選択されたファイル単位でのみ開放します。'
+          },
+          {
+            code: 'Step 9',
+            title: '共有終了・自動掃除（手動無効化 / 箱フォルダ削除 / 時間トリガー）',
+            from: 2,
+            to: 4,
+            via: [0, 3],
+            arrowLabel: '管理画面無効化 / Drive箱フォルダ手動削除 / 毎時トリガーで自動ゴミ箱移動',
+            payload: 'Trigger(毎時): expires_at < now → folder.setTrashed(true) & boxes.status = "EXPIRED"（履歴行は一覧に残す）',
+            summary: '箱主が管理画面から無効化するか、Drive上で箱フォルダごとゴミ箱へ移すと即座に共有終了。さらに時間主導型トリガーが期限切れの箱フォルダを自動でゴミ箱へ移動し、boxesのstatusをEXPIREDへ更新します。',
+            techPoint: '期限切れ・無効化済みの行もboxesシートに履歴として残るため、箱主は管理画面で過去の箱一覧を確認できます。',
+            securityPoint: '一時共有開放したファイルの権限残存やDrive容量圧迫を、自動クリーンアップトリガーによって確実に防止します。'
+          }
+        ]
+      },
+
+      RECEIVE: {
+        badge: 'RECEIVE',
+        title: 'もらうフロー（複数ゲスト → 箱主：追投OK・見える＆消せる・DL不可）',
+        steps: [
+          {
+            code: 'Step 1',
+            title: '箱主ログイン＆認可検証（Firebase Auth → GAS側で5人限定チェック）',
+            from: 0,
+            to: 2,
+            via: [1],
+            arrowLabel: 'Firebase Auth IDトークン取得 → GAS側でaccounts:lookup＆5人照合',
+            payload: 'POST /exec (Content-Type: text/plain) { action:"createReceiveBox", idToken, passcode?, expireHours }',
+            summary: '箱主がFirebase AuthでGoogleログインし、管理画面から「もらう箱」の作成をリクエスト。GASがFirebase REST APIでIDトークンを検証し、許可された家族5人であることを確認します。',
+            techPoint: 'あげるフローと共通の認証・認可基盤を使用し、フロントエンド（Firebase Hosting）からContent-Type: text/plainでGASを呼び出します。',
+            securityPoint: '未認可の第三者が空の箱を勝手に作成してDriveを占有するリスクを、GAS側の厳密な5人チェックで遮断します。'
+          },
+          {
+            code: 'Step 2',
+            title: '空の箱を作成（direction=RECEIVEで箱フォルダ生成＆ACTIVE登録）',
+            from: 2,
+            to: 3,
+            via: [4],
+            arrowLabel: '{owner_email}/{box_id}フォルダ作成 → boxesシートへACTIVEで記録',
+            payload: 'Drive: root/{email}/{box_id}/  /  Sheet[boxes]: { box_id, owner_email, direction:"RECEIVE", status:"ACTIVE", folder_id, passcode_hash, expires_at }',
+            summary: 'GASがLockServiceで排他制御しつつ、{owner_email}/{box_id} の空フォルダをGoogle Driveに作成し、boxesシートへ direction="RECEIVE", status="ACTIVE" で登録します。',
+            techPoint: '親フォルダからの相対パス解決により、初めて箱を作った家族メンバーの {owner_email} フォルダも自動で生成されます。',
+            securityPoint: '任意設定の6桁パスコードはSHA-256ハッシュ値として保存されます。'
+          },
+          {
+            code: 'Step 3',
+            title: '共有URL配布（1人または複数人のゲストへ ?box=<GUID> を送付）',
+            from: 0,
+            to: 5,
+            via: [],
+            arrowLabel: '?box=<GUID>をゲスト（複数人可）へ配布 ※非公開にしたい相手とは箱を分ける',
+            payload: 'https://<YourHakonushiApp>.web.app/?box=9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+            summary: '箱主が受取用URLを1人または複数人（旅行の写真集めなど）へ送付します。ゲスト同士で投稿ファイル名を見せ合いたくない場合は、相手ごとに別の箱を発行する運用で柔軟に分離できます。',
+            techPoint: 'ゲスト側にはGoogleアカウントも専用アプリも不要。スマホのブラウザからそのまま写真や動画を送れます。',
+            securityPoint: 'URL内に箱主のメールアドレスやフォルダ構造は一切露出しません。'
+          },
+          {
+            code: 'Step 4',
+            title: 'ゲストアクセス＆パスコード検証（直リンク/GUID入力・5回ロック）',
+            from: 5,
+            to: 2,
+            via: [3, 4],
+            arrowLabel: '直リンクまたはGUID入力 → 期限・状態・箱フォルダ存在・パスコード検証',
+            payload: 'POST /exec { action:"verifyBox", box_id, passcode? } → 期限内・ACTIVE・パスコード一致を確認（5回失敗でLOCKED）',
+            summary: 'ゲストがURLを開く（またはエントリ画面からGUID手入力）と、GASが有効期限・ステータス・箱フォルダの未削除状態を確認。パスコード設定時は6桁照合（5回連続失敗でLOCKED）を行います。',
+            techPoint: '直リンク（?box=<GUID>）時はエントリ画面をスキップしてスムーズに箱の画面へ遷移します。',
+            securityPoint: '認証なしのゲスト画面でも、GUIDの推測困難性＋任意パスコード＋5回ロックにより不正アクセスを抑止します。'
+          },
+          {
+            code: 'Step 5',
+            title: '投稿済み一覧の表示（見える・消せる・ただしダウンロード不可）',
+            from: 2,
+            to: 5,
+            via: [3],
+            arrowLabel: 'filesシートのACTIVE一覧を返却（メタデータのみ／ダウンロード機能なし）',
+            payload: 'Response: [{ file_id, file_name, file_size, uploader_name, uploaded_at }, ...]  ※Download URLは一切発行しない',
+            summary: 'GASがfilesシートから該当box_idかつstatus="ACTIVE"のメタデータ（ファイル名・サイズ・投稿者メモ）を返却して一覧表示します。何が投稿済みか確認でき、誤送信の削除も可能ですが、ダウンロードはできません。',
+            techPoint: 'Drive上のファイル自体は終始「非公開」のまま一切共有権限を付与しないため、ダウンロードリンクが存在しません。',
+            securityPoint: '「見える・消せる・ダウンロード不可」とすることで、重複投稿を防ぎつつ他人のファイル実体の持ち出しリスクを遮断しています。'
+          },
+          {
+            code: 'Step 6',
+            title: '複数ファイル直接アップロード（追投OK・ACTIVE維持）',
+            from: 5,
+            to: 4,
+            via: [2, 3],
+            arrowLabel: '<input multiple>＋任意メモ → Origin付きセッションURI → 直接PUT → files記録',
+            payload: '1) GAS: Resumable URI (parents:[folder_id], Origin)  2) Browser: PUT <URI>  3) Sheet[files]: { file_id, box_id, file_name, uploader_name, status:"ACTIVE" }',
+            summary: 'ゲストが複数ファイルと任意のお名前メモを選択して送信。GASが箱フォルダ宛のResumable UploadセッションURIを発行し、ブラウザからDriveへ直接PUTします。完了後もboxesはACTIVEのまま維持され何度でも追投可能です。',
+            techPoint: '複数人から同じファイル名（例：IMG_0001.JPG）が送られても、Driveは別々のfile_idとして保存するため上書きされません。',
+            securityPoint: 'ゲストブラウザにはDriveのOAuthトークンを渡さず、1ファイル限定のセッションURIのみを払い出します。'
+          },
+          {
+            code: 'Step 7',
+            title: 'ゲストによる誤送信ファイルの取消（ゴミ箱移動＋論理削除）',
+            from: 5,
+            to: 4,
+            via: [2, 3],
+            arrowLabel: '一覧の削除ボタン → file.setTrashed(true) ＆ filesシートをDELETEDに更新',
+            payload: 'POST /exec { action:"deleteFile", box_id, file_id } → Drive: setTrashed(true) & Sheet[files]: status = "DELETED"',
+            summary: 'ゲストが一覧の削除ボタンを押すと、GASが対象ファイルをGoogle Driveのゴミ箱へ移動（setTrashed(true)）し、filesシートのstatusをDELETEDへ論理削除します。一覧からは即座に消えます。',
+            techPoint: '物理削除（完全削除）ではなくGoogle Driveのゴミ箱へ移動する仕様のため、30日間はDrive上に実体が残ります。',
+            securityPoint: '万が一ゲストが誤って他の人の投稿ファイルを消してしまっても、箱主がGoogle Driveのゴミ箱から安全に復元できるフェイルセーフ設計です。'
+          },
+          {
+            code: 'Step 8',
+            title: '箱主の確認・取得（管理画面一覧またはDrive箱フォルダから一括DL）',
+            from: 0,
+            to: 4,
+            via: [2, 3],
+            arrowLabel: 'owner_emailで絞込一覧表示 → 個別確認 または Drive箱フォルダ一括ZIP DL',
+            payload: '管理画面: boxes(owner_email==me) & files(ACTIVE) / Drive: {owner_email}/{box_id}/ をフォルダごと一括ダウンロード',
+            summary: '箱主は管理画面の「箱一覧（期限切れ含む）」から自分の箱と投稿ファイルを確認できます。大量の写真を集めた場合も、Google Drive上の箱フォルダを開いて一括ZIPダウンロードが可能です。',
+            techPoint: 'Driveがフォルダ一括ダウンロード時に同名ファイルへ自動で連番を振ってくれるため、スマホ写真のファイル名被りも問題になりません。',
+            securityPoint: '管理画面の一覧取得APIはIDトークンで検証したowner_emailでフィルタリングされるため、家族間でも互いの箱は見えません。'
+          },
+          {
+            code: 'Step 9',
+            title: '箱のクローズ・自動掃除（手動無効化 / 時間主導型トリガー）',
+            from: 2,
+            to: 3,
+            via: [0],
+            arrowLabel: '箱主の手動無効化 または 毎時トリガーで期限切れ箱をEXPIRED化',
+            payload: 'Trigger(毎時): expires_at < now → boxes.status = "EXPIRED"（投稿受付終了・受け取ったファイルは箱主用に保持）',
+            summary: '募集を終えたいときは箱主が管理画面から箱を手動無効化（DISABLED）します。放置しても有効期限が来れば時間主導型トリガーが自動でEXPIREDへ更新し、新規投稿や削除を締め切ります。',
+            techPoint: '「もらう箱」は受け取った大事なファイルを消さないよう、期限切れ時は受付ステータスのみEXPIREDにしてファイルはDriveに残す運用（不要になったら箱主が手動削除）が安全です。',
+            securityPoint: '期限切れ後はゲストからの追加アップロードや既存ファイル一覧の閲覧・削除をすべて拒否します。'
+          }
+        ]
+      }
+    };
+
+    // ==========================================
+    // アプリケーション状態管理
+    // ==========================================
+    let currentMainTab = 'SEND';     // 'SEND' | 'RECEIVE' | 'SCHEMA'
+    let currentStepIndex = 0;        // 0 〜 8
+    let currentViewMode = 'diagram'; // 'diagram' | 'list'
+
+    // ==========================================
+    // メイン描画関数
+    // ==========================================
+    function render() {
+      updateMainTabsUI();
+
+      const panelFlow = document.getElementById('panelFlow');
+      const panelSchema = document.getElementById('panelSchema');
+      const stepControls = document.getElementById('stepControls');
+      const viewModeWrapper = document.getElementById('viewModeWrapper');
+
+      if (currentMainTab === 'SCHEMA') {
+        panelFlow.classList.add('hidden');
+        panelSchema.classList.remove('hidden');
+        stepControls.classList.add('hidden');
+        viewModeWrapper.classList.add('hidden');
+        return;
+      }
+
+      // SEND / RECEIVE タブ表示
+      panelFlow.classList.remove('hidden');
+      panelSchema.classList.add('hidden');
+      viewModeWrapper.classList.remove('hidden');
+
+      if (currentViewMode === 'diagram') {
+        stepControls.classList.remove('hidden');
+      } else {
+        stepControls.classList.add('hidden');
+      }
+
+      const flowData = FLOWS[currentMainTab];
+      const steps = flowData.steps;
+      const step = steps[currentStepIndex];
+
+      // ステップカウンター＆前後ボタン更新
+      document.getElementById('stepCounter').textContent = `Step ${currentStepIndex + 1} / ${steps.length}`;
+      document.getElementById('btnPrev').disabled = currentStepIndex === 0;
+      document.getElementById('btnNext').disabled = currentStepIndex === steps.length - 1;
+
+      // 次へボタンの色をテーマに合わせる
+      const btnNext = document.getElementById('btnNext');
+      btnNext.className = currentMainTab === 'SEND'
+        ? 'px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1'
+        : 'px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1';
+
+      // ステージヘッダー更新
+      const badgeEl = document.getElementById('stageModeBadge');
+      badgeEl.textContent = flowData.badge;
+      badgeEl.className = currentMainTab === 'SEND'
+        ? 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800'
+        : 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800';
+      document.getElementById('stageModeTitle').textContent = flowData.title;
+
+      // 各セクション描画
+      renderNodesHeader(step);
+      renderSequenceRows(steps, step);
+      renderDetailCard(step, flowData);
+      renderQuickNav(steps);
+      renderAllStepsList(flowData);
+    }
+
+    // 上部3タブのスタイル更新
+    function updateMainTabsUI() {
+      const configs = {
+        SEND: {
+          activeTab: 'border-indigo-500 bg-indigo-50/70 text-indigo-950 shadow-sm',
+          activeIcon: 'bg-indigo-600 text-white shadow-sm'
+        },
+        RECEIVE: {
+          activeTab: 'border-amber-500 bg-amber-50/70 text-amber-950 shadow-sm',
+          activeIcon: 'bg-amber-600 text-white shadow-sm'
+        },
+        SCHEMA: {
+          activeTab: 'border-slate-700 bg-slate-100/90 text-slate-900 shadow-sm',
+          activeIcon: 'bg-slate-800 text-white shadow-sm'
+        }
+      };
+
+      ['SEND', 'RECEIVE', 'SCHEMA'].forEach(key => {
+        const tabEl = document.getElementById(`mainTab-${key}`);
+        const iconEl = document.getElementById(`mainTabIcon-${key}`);
+        if (currentMainTab === key) {
+          tabEl.className = `text-left px-3.5 py-3 rounded-xl border-2 transition-all flex items-center gap-3 ${configs[key].activeTab}`;
+          iconEl.className = `w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${configs[key].activeIcon}`;
+        } else {
+          tabEl.className = 'text-left px-3.5 py-3 rounded-xl border-2 border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-all flex items-center gap-3';
+          iconEl.className = 'w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shrink-0';
+        }
+      });
+    }
+
+    // 6ノードヘッダー描画
+    function renderNodesHeader(activeStep) {
+      const isSend = currentMainTab === 'SEND';
+      const toBadgeColor = isSend ? 'bg-indigo-600' : 'bg-amber-600';
+
+      document.getElementById('nodesHeader').innerHTML = NODES.map(node => {
+        const isFrom = activeStep.from === node.id;
+        const isTo = activeStep.to === node.id;
+        const isVia = activeStep.via.includes(node.id);
+        const isActive = isFrom || isTo || isVia;
+
+        let roleBadge = '';
+        if (isFrom) {
+          roleBadge = '<span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-white">送信元</span>';
+        } else if (isTo) {
+          roleBadge = `<span class="px-1.5 py-0.5 text-[10px] font-bold rounded ${toBadgeColor} text-white">送信先</span>`;
+        } else if (isVia) {
+          roleBadge = '<span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-violet-500 text-white">連携</span>';
+        }
+
+        return `
+          <div class="rounded-xl border-2 p-2.5 transition-all duration-300 ${isActive ? node.borderActive + ' shadow-md -translate-y-0.5' : node.borderIdle + ' opacity-80'}">
+            <div class="flex items-center justify-between gap-1 mb-1.5">
+              <div class="w-7 h-7 rounded-lg ${node.iconBg} flex items-center justify-center shrink-0 shadow-sm">
+                ${node.icon}
+              </div>
+              ${roleBadge}
+            </div>
+            <div class="text-xs font-bold text-slate-900 leading-tight truncate">${node.name}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5 leading-snug truncate">${node.sub}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 6レーン・シーケンス矢印行描画
+    function renderSequenceRows(steps, activeStep) {
+      const isSend = currentMainTab === 'SEND';
+      const laneCenters = [8.333, 25.0, 41.666, 58.333, 75.0, 91.666];
+      const accentHex = isSend ? '#4f46e5' : '#d97706';
+      const accentDotBg = isSend ? 'bg-indigo-600 ring-indigo-200' : 'bg-amber-600 ring-amber-200';
+      const accentPacketBg = isSend ? 'bg-indigo-500' : 'bg-amber-500';
+      const accentRowActive = isSend
+        ? 'bg-indigo-50/75 border-indigo-300 shadow-sm ring-1 ring-indigo-200'
+        : 'bg-amber-50/75 border-amber-300 shadow-sm ring-1 ring-amber-200';
+      const accentPillActive = isSend
+        ? 'bg-indigo-600 text-white border-indigo-600'
+        : 'bg-amber-600 text-white border-amber-600';
+
+      document.getElementById('sequenceRows').innerHTML = steps.map((s, idx) => {
+        const isSelected = idx === currentStepIndex;
+        const fromX = laneCenters[s.from];
+        const toX = laneCenters[s.to];
+        const isRight = toX > fromX;
+        const leftX = Math.min(fromX, toX);
+        const widthX = Math.abs(toX - fromX);
+        const strokeColor = isSelected ? accentHex : '#94a3b8';
+
+        const viaMarkersHtml = s.via.map(viaId => {
+          const viaX = laneCenters[viaId];
+          return `
+            <div style="left: ${viaX}%;" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center">
+              <div class="w-3 h-3 rounded-full border-2 border-white ${isSelected ? 'bg-violet-500 ring-4 ring-violet-200' : 'bg-violet-300'}"></div>
+              <span class="text-[9px] font-bold mt-3.5 whitespace-nowrap px-1 rounded ${isSelected ? 'bg-violet-100 text-violet-800' : 'text-slate-400'}">連携</span>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div onclick="jumpToStep(${idx})" class="cursor-pointer rounded-xl border transition-all duration-200 py-2 px-2 relative ${
+            isSelected ? accentRowActive : 'bg-white/85 hover:bg-slate-50 border-slate-200/80 opacity-75 hover:opacity-100'
+          }">
+            <!-- ステップラベル -->
+            <div class="flex items-center justify-center mb-1 relative z-20">
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold shadow-sm border ${
+                isSelected ? accentPillActive : 'bg-white text-slate-700 border-slate-200'
+              }">
+                <span class="font-bold">${s.code}</span>
+                <span class="truncate max-w-[560px] sm:max-w-[740px]">${s.arrowLabel}</span>
+              </div>
+            </div>
+
+            <!-- 矢印トラック -->
+            <div class="relative h-6 w-full">
+              <!-- 送信元ドット -->
+              <div style="left: ${fromX}%;" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full z-20 ${
+                isSelected ? accentDotBg + ' ring-4' : 'bg-slate-400'
+              }"></div>
+
+              <!-- 送信先ドット -->
+              <div style="left: ${toX}%;" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full z-20 ${
+                isSelected ? accentDotBg + ' ring-4' : 'bg-slate-400'
+              }"></div>
+
+              <!-- 連携ノードマーカー -->
+              ${viaMarkersHtml}
+
+              <!-- 矢印本体 -->
+              <div style="left: ${leftX}%; width: ${widthX}%;" class="absolute top-1/2 -translate-y-1/2 h-6 flex items-center">
+                <svg class="w-full h-6 overflow-visible" preserveAspectRatio="none">
+                  <line
+                    x1="${isRight ? '4' : '100%'}"
+                    y1="12"
+                    x2="${isRight ? '100%' : '4'}"
+                    y2="12"
+                    stroke="${strokeColor}"
+                    stroke-width="${isSelected ? '3' : '2'}"
+                    class="${isSelected ? 'animate-dash' : ''}"
+                  />
+                </svg>
+
+                <!-- 矢じり -->
+                ${isRight ? `
+                  <svg class="w-3.5 h-3.5 absolute -right-1.5 top-1/2 -translate-y-1/2 shrink-0" viewBox="0 0 16 16" fill="${strokeColor}">
+                    <path d="M4 2l10 6-10 6V2z"/>
+                  </svg>
+                ` : `
+                  <svg class="w-3.5 h-3.5 absolute -left-1.5 top-1/2 -translate-y-1/2 shrink-0" viewBox="0 0 16 16" fill="${strokeColor}">
+                    <path d="M12 2L2 8l10 6V2z"/>
+                  </svg>
+                `}
+
+                <!-- パケットアニメーション（選択中のみ） -->
+                ${isSelected ? `
+                  <div class="absolute top-1/2 w-3.5 h-3.5 rounded-full ${accentPacketBg} border-2 border-white shadow-md z-30 ${isRight ? 'packet-right' : 'packet-left'}"></div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 下部詳細解説カード描画
+    function renderDetailCard(step, flowData) {
+      const fromNode = NODES[step.from];
+      const toNode = NODES[step.to];
+      const viaNodes = step.via.map(id => NODES[id]);
+      const isSend = currentMainTab === 'SEND';
+      const badgeBg = isSend ? 'bg-indigo-600' : 'bg-amber-600';
+      const subText = isSend ? 'text-indigo-700' : 'text-amber-700';
+
+      document.getElementById('detailCard').innerHTML = `
+        <div class="p-5 sm:p-6">
+          <!-- ヘッダー行 -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div class="flex items-start sm:items-center gap-3">
+              <span class="px-3 py-1 rounded-xl ${badgeBg} text-white text-sm font-bold shadow-sm shrink-0">
+                ${step.code}
+              </span>
+              <div>
+                <div class="text-xs font-semibold ${subText}">${flowData.title}</div>
+                <h3 class="text-base sm:text-lg font-bold text-slate-900">${step.title}</h3>
+              </div>
+            </div>
+
+            <!-- 通信経路ピル -->
+            <div class="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+              <span class="px-2.5 py-1 rounded-lg ${fromNode.badgeBg}">${fromNode.name}</span>
+              <span class="text-slate-400">→</span>
+              ${viaNodes.map(vn => `
+                <span class="px-2 py-1 rounded-lg bg-violet-50 text-violet-800 border border-violet-200 text-[11px]">連携: ${vn.name}</span>
+                <span class="text-slate-400">→</span>
+              `).join('')}
+              <span class="px-2.5 py-1 rounded-lg ${toNode.badgeBg}">${toNode.name}</span>
+            </div>
+          </div>
+
+          <!-- 概要＆ペイロード -->
+          <div class="py-4 space-y-3">
+            <p class="text-sm text-slate-700 leading-relaxed">${step.summary}</p>
+            <div class="bg-slate-900 text-slate-100 rounded-xl px-4 py-2.5 font-mono text-xs overflow-x-auto custom-scrollbar flex items-center gap-2.5">
+              <span class="text-amber-400 font-bold shrink-0">PAYLOAD</span>
+              <code class="whitespace-nowrap">${escapeHtml(step.payload)}</code>
+            </div>
+          </div>
+
+          <!-- 設計・セキュリティのポイント（2カラム） -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+            <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4">
+              <div class="flex items-center gap-2 text-indigo-900 font-bold text-xs sm:text-sm mb-1.5">
+                <svg class="w-4 h-4 shrink-0 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                設計・実装のポイント
+              </div>
+              <p class="text-xs sm:text-sm text-indigo-950/85 leading-relaxed">${step.techPoint}</p>
+            </div>
+
+            <div class="bg-amber-50/70 border border-amber-200/70 rounded-xl p-4">
+              <div class="flex items-center gap-2 text-amber-900 font-bold text-xs sm:text-sm mb-1.5">
+                <svg class="w-4 h-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                セキュリティ・運用の工夫
+              </div>
+              <p class="text-xs sm:text-sm text-amber-950/85 leading-relaxed">${step.securityPoint}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // クイックジャンプ描画
+    function renderQuickNav(steps) {
+      const isSend = currentMainTab === 'SEND';
+      const activeClass = isSend
+        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+        : 'bg-amber-600 text-white border-amber-600 shadow-sm';
+      const hoverClass = isSend
+        ? 'hover:bg-indigo-50 hover:text-indigo-800'
+        : 'hover:bg-amber-50 hover:text-amber-800';
+
+      document.getElementById('quickNav').innerHTML = steps.map((s, idx) => `
+        <button onclick="jumpToStep(${idx})" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+          idx === currentStepIndex
+            ? activeClass
+            : 'bg-slate-50 text-slate-600 border-slate-200 ' + hoverClass
+        }">
+          <span class="font-bold mr-1">${idx + 1}.</span>
+          <span class="hidden sm:inline">${s.title.length > 15 ? s.title.slice(0, 15) + '…' : s.title}</span>
+        </button>
+      `).join('');
+    }
+
+    // 全ステップ一覧ビュー描画
+    function renderAllStepsList(flowData) {
+      const isSend = currentMainTab === 'SEND';
+      document.getElementById('listHeading').textContent = `${flowData.title} 全${flowData.steps.length}ステップ一覧`;
+      const badgeClass = isSend ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800';
+      const hoverBorder = isSend ? 'hover:border-indigo-300 hover:bg-indigo-50/20' : 'hover:border-amber-300 hover:bg-amber-50/20';
+
+      document.getElementById('allStepsContainer').innerHTML = flowData.steps.map((s, idx) => {
+        const fromNode = NODES[s.from];
+        const toNode = NODES[s.to];
+        return `
+          <div onclick="jumpFromList(${idx})" class="cursor-pointer bg-white border border-slate-200 ${hoverBorder} rounded-2xl p-4 sm:p-5 transition-all shadow-sm group">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+              <div class="flex items-center gap-2.5">
+                <span class="px-2.5 py-1 rounded-lg ${badgeClass} text-xs font-bold shrink-0">${s.code}</span>
+                <h4 class="text-sm sm:text-base font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">${s.title}</h4>
+              </div>
+              <div class="flex items-center gap-1.5 text-[11px] font-semibold shrink-0">
+                <span class="px-2 py-0.5 rounded ${fromNode.badgeBg}">${fromNode.name}</span>
+                <span class="text-slate-400">→</span>
+                <span class="px-2 py-0.5 rounded ${toNode.badgeBg}">${toNode.name}</span>
+              </div>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-600 mb-3 leading-relaxed">${s.summary}</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+              <div class="bg-indigo-50/60 border border-indigo-100 rounded-lg p-2.5 text-indigo-950/85">
+                <span class="font-bold text-indigo-900">設計: </span>${s.techPoint}
+              </div>
+              <div class="bg-amber-50/70 border border-amber-200/70 rounded-lg p-2.5 text-amber-950/85">
+                <span class="font-bold text-amber-900">安全: </span>${s.securityPoint}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // インタラクション制御
+    // ==========================================
+    function selectMainTab(tabKey) {
+      if (currentMainTab === tabKey) return;
+      currentMainTab = tabKey;
+      if (tabKey === 'SEND' || tabKey === 'RECEIVE') {
+        currentStepIndex = 0;
+      }
+      render();
+    }
+
+    function nextStep() {
+      if (currentMainTab === 'SCHEMA') return;
+      const maxIndex = FLOWS[currentMainTab].steps.length - 1;
+      if (currentStepIndex < maxIndex) {
+        currentStepIndex++;
+        render();
+      }
+    }
+
+    function prevStep() {
+      if (currentMainTab === 'SCHEMA') return;
+      if (currentStepIndex > 0) {
+        currentStepIndex--;
+        render();
+      }
+    }
+
+    function jumpToStep(index) {
+      currentStepIndex = index;
+      render();
+    }
+
+    function jumpFromList(index) {
+      currentStepIndex = index;
+      setViewMode('diagram');
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      const viewDiagram = document.getElementById('viewDiagram');
+      const viewList = document.getElementById('viewList');
+      const stepControls = document.getElementById('stepControls');
+      const btnDiagram = document.getElementById('btnViewDiagram');
+      const btnList = document.getElementById('btnViewList');
+
+      if (mode === 'diagram') {
+        viewDiagram.classList.remove('hidden');
+        viewList.classList.add('hidden');
+        if (currentMainTab !== 'SCHEMA') stepControls.classList.remove('hidden');
+        btnDiagram.className = 'px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-white text-indigo-700 shadow-sm';
+        btnList.className = 'px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900';
+      } else {
+        viewDiagram.classList.add('hidden');
+        viewList.classList.remove('hidden');
+        stepControls.classList.add('hidden');
+        btnList.className = 'px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-white text-indigo-700 shadow-sm';
+        btnDiagram.className = 'px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900';
+      }
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // キーボード操作（← / → キーでステップ送り）
+    document.addEventListener('keydown', (e) => {
+      if (currentMainTab === 'SCHEMA' || currentViewMode !== 'diagram') return;
+      if (e.key === 'ArrowRight') nextStep();
+      if (e.key === 'ArrowLeft') prevStep();
+    });
+
+    // 初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      render();
+    });
+  </script>
+</body>
+</html>

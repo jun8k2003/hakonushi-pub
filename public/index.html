@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <title>hakonushi（箱主）— 軽量ファイル受け渡し</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- 共通ヘッダー -->
+    <header class="app-header">
+      <div class="header-inner">
+        <a href="#" id="brand-link" class="brand" aria-label="hakonushi トップへ">
+          <span class="brand-icon" aria-hidden="true">📦</span>
+          <span class="brand-title">hakonushi</span>
+          <span class="brand-sub">箱主</span>
+        </a>
+        <div id="header-user" class="header-user hidden">
+          <span id="header-user-email" class="user-email"></span>
+          <button type="button" id="btn-logout" class="btn btn-ghost btn-sm">ログアウト</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 設定未完了時の警告バナー -->
+    <div id="config-warning" class="banner banner-error hidden" role="alert">
+      <strong>設定ファイルが見つかりません：</strong>
+      <code>public/config.js</code> を作成し、Firebase設定とGAS WebアプリURLを記入してください（<code>SETUP_GUIDE.md</code> 参照）。
+    </div>
+
+    <!-- メインコンテンツ -->
+    <main class="main-container">
+      <!-- 1. エントリ画面（箱主 / ゲスト選択） -->
+      <section id="view-entry" class="view hidden" aria-label="入口選択">
+        <div class="hero">
+          <h1>ファイルをあげる箱、もらう箱</h1>
+        </div>
+
+        <div class="entry-grid">
+          <div class="card entry-card">
+            <div class="entry-badge badge-owner">箱主</div>
+            <h2>箱をつくる・管理する</h2>
+            <p class="muted">
+              許可されたGoogleアカウントでログインし、「箱主→ゲスト」「箱主←ゲスト」の箱を作成・管理します。
+            </p>
+            <button type="button" id="btn-google-login" class="btn btn-primary btn-block">
+              Googleアカウントでログイン
+            </button>
+          </div>
+
+          <div class="card entry-card">
+            <div class="entry-badge badge-guest">ゲスト</div>
+            <h2>渡された箱をひらく</h2>
+            <p class="muted">
+              ログインは不要です。共有された箱IDを入力して箱にアクセスします。
+            </p>
+            <form id="form-entry-guest" class="stack-sm">
+              <label class="field-label" for="input-entry-box-id">箱ID</label>
+              <input
+                type="text"
+                id="input-entry-box-id"
+                class="input"
+                placeholder="例: 550e8400-e29b-41d4-a716-446655440000"
+                autocomplete="off"
+                required
+              >
+              <button type="submit" class="btn btn-secondary btn-block">箱をひらく</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 箱主ダッシュボード画面 -->
+      <section id="view-owner" class="view hidden" aria-label="箱主ダッシュボード">
+        <div class="toolbar">
+          <h1 class="page-title">あなたの箱一覧</h1>
+          <div class="toolbar-actions">
+            <button type="button" id="btn-create-send" class="btn btn-primary">＋ 箱主→ゲスト</button>
+            <button type="button" id="btn-create-receive" class="btn btn-secondary">＋ 箱主←ゲスト</button>
+            <button type="button" id="btn-refresh-boxes" class="btn btn-ghost" title="一覧を更新">↻ 更新</button>
+          </div>
+        </div>
+
+        <div id="owner-boxes-empty" class="card empty-state hidden">
+          <p class="empty-icon">📦</p>
+          <p class="empty-title">まだ箱がありません</p>
+          <p class="muted text-sm">「＋ 箱主→ゲスト」または「＋ 箱主←ゲスト」から最初の箱を作成しましょう。</p>
+        </div>
+
+        <div id="owner-boxes-list" class="box-list"></div>
+      </section>
+
+      <!-- 3. ゲスト画面 -->
+      <section id="view-guest" class="view hidden" aria-label="ゲスト画面">
+        <!-- パスコード入力 -->
+        <div id="guest-passcode-panel" class="card narrow-card hidden">
+          <div class="panel-header">
+            <span class="entry-badge badge-guest">鍵の確認</span>
+            <h2>パスコードを入力してください</h2>
+            <p class="muted text-sm">
+              この箱は6桁のパスコードで保護されています。（5回連続で間違えるとロックされます）
+            </p>
+          </div>
+          <form id="form-guest-passcode" class="stack-md">
+            <div>
+              <label class="field-label" for="input-guest-passcode">6桁パスコード</label>
+              <input
+                type="password"
+                id="input-guest-passcode"
+                class="input input-code"
+                inputmode="numeric"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                placeholder="000000"
+                autocomplete="one-time-code"
+                required
+              >
+            </div>
+            <p id="guest-passcode-error" class="error-text hidden" role="alert"></p>
+            <button type="submit" class="btn btn-primary btn-block">箱をひらく</button>
+          </form>
+        </div>
+
+        <!-- エラー・利用不可パネル -->
+        <div id="guest-error-panel" class="card narrow-card hidden">
+          <div class="empty-state compact">
+            <p class="empty-icon">🔒</p>
+            <h2 id="guest-error-title">この箱は開けません</h2>
+            <p id="guest-error-message" class="muted"></p>
+            <button type="button" id="btn-guest-back-entry" class="btn btn-ghost">トップへ戻る</button>
+          </div>
+        </div>
+
+        <!-- 箱の中身パネル -->
+        <div id="guest-box-panel" class="hidden">
+          <div class="card box-hero-card">
+            <div class="box-hero-meta">
+              <span id="guest-box-direction-badge" class="pill"></span>
+              <span id="guest-box-expires" class="muted text-sm"></span>
+            </div>
+            <h1 id="guest-box-name" class="page-title"></h1>
+            <p id="guest-box-subtitle" class="muted text-sm"></p>
+          </div>
+
+          <!-- SEND箱（ダウンロード） -->
+          <div id="guest-send-section" class="card hidden">
+            <h2 class="section-title">ファイル一覧</h2>
+            <p class="muted text-sm">ダウンロードしたいファイルのボタンを押してください。</p>
+            <div id="guest-send-files" class="file-list"></div>
+          </div>
+
+          <!-- RECEIVE箱（アップロード＋投稿済み一覧・取消） -->
+          <div id="guest-receive-section" class="stack-lg hidden">
+            <div class="card">
+              <h2 class="section-title">ファイルを箱に入れる</h2>
+              <form id="form-guest-upload" class="stack-md">
+                <div>
+                  <label class="field-label" for="input-guest-uploader">お名前・メモ（任意）</label>
+                  <input
+                    type="text"
+                    id="input-guest-uploader"
+                    class="input"
+                    maxlength="60"
+                    placeholder="例: 山田（写真3枚です）"
+                  >
+                </div>
+
+                <div>
+                  <label class="field-label" for="input-guest-files">ファイル選択（複数可）</label>
+                  <div id="guest-dropzone" class="dropzone" tabindex="0">
+                    <input type="file" id="input-guest-files" class="file-input-hidden" multiple>
+                    <p class="dropzone-title">クリックしてファイルを選択、またはここにドロップ</p>
+                    <p class="muted text-xs">大容量ファイル（50MB超）もそのままアップロードできます</p>
+                  </div>
+                  <ul id="guest-selected-files" class="selected-file-list"></ul>
+                </div>
+
+                <!-- 転送中の画面ロック防止スイッチ -->
+                <div class="toggle-row">
+                  <div class="toggle-copy">
+                    <span class="toggle-title">転送中は画面をロックしない</span>
+                    <span class="toggle-desc muted text-xs" data-wakelock-hint>大容量ファイルの送信中にスリープで中断されるのを防ぎます</span>
+                  </div>
+                  <label class="toggle-switch" aria-label="転送中は画面をロックしない">
+                    <input type="checkbox" class="toggle-input" data-wakelock-toggle checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <!-- ゲストアップロード進捗バー -->
+                <div id="guest-upload-progress" class="progress-panel hidden">
+                  <div class="progress-header">
+                    <span id="guest-upload-status-text">アップロード中...</span>
+                    <span id="guest-upload-count-text" class="progress-count">0 / 0</span>
+                  </div>
+                  <div class="progress-track">
+                    <div id="guest-upload-bar" class="progress-fill" style="width: 0%"></div>
+                  </div>
+                  <p id="guest-upload-file-text" class="muted text-xs"></p>
+                </div>
+
+                <button type="submit" id="btn-guest-upload-submit" class="btn btn-primary btn-block" disabled>
+                  選択したファイルを送信する
+                </button>
+              </form>
+            </div>
+
+            <div class="card">
+              <div class="section-header-row">
+                <h2 class="section-title">この箱に届いているファイル</h2>
+                <button type="button" id="btn-guest-refresh" class="btn btn-ghost btn-sm">↻ 更新</button>
+              </div>
+              <p class="muted text-xs">
+                ※ 受け取り専用の箱のため、投稿済みファイルのダウンロードはできません。誤送信した場合は「取り消す」から削除できます。
+              </p>
+              <div id="guest-receive-files" class="file-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- モーダル: 箱の作成（SEND / RECEIVE） -->
+  <div id="modal-create-box" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-create-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-create-title">箱をつくる</h2>
+        <button type="button" class="btn-icon" data-close-modal="modal-create-box" aria-label="閉じる">✕</button>
+      </div>
+      <form id="form-create-box" class="modal-body stack-md">
+        <input type="hidden" id="input-create-direction" value="SEND">
+
+        <div>
+          <label class="field-label" for="input-create-box-name">箱名</label>
+          <input
+            type="text"
+            id="input-create-box-name"
+            class="input"
+            maxlength="100"
+            placeholder="はこのなまえ"
+          >
+          <p class="field-hint">未入力の場合は作成日時（例: 2026/11/22 11:00）が自動で設定されます。</p>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label class="field-label" for="input-create-expires">有効期限</label>
+            <select id="input-create-expires" class="input">
+              <option value="0.5">30分</option>
+              <option value="1">1時間</option>
+              <option value="3">3時間</option>
+              <option value="6">6時間</option>
+              <option value="24">24時間</option>
+              <option value="72" selected>3日間（72時間）</option>
+              <option value="168">7日間</option>
+              <option value="336">14日間</option>
+              <option value="720">30日間</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label" for="input-create-passcode">6桁パスコード（任意）</label>
+            <div class="input-group">
+              <input
+                type="text"
+                id="input-create-passcode"
+                class="input input-code"
+                inputmode="numeric"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                placeholder="未設定（空欄可）"
+                autocomplete="off"
+              >
+              <button type="button" id="btn-gen-passcode" class="btn btn-ghost btn-sm" title="ランダム生成">生成</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEND箱のみ表示するファイル選択 -->
+        <div id="create-send-files-area" class="stack-sm">
+          <div>
+            <label class="field-label" for="input-owner-files">渡すファイル（複数選択可）</label>
+            <div id="owner-dropzone" class="dropzone" tabindex="0">
+              <input type="file" id="input-owner-files" class="file-input-hidden" multiple>
+              <p class="dropzone-title">クリックしてファイルを選択、またはここにドロップ</p>
+              <p class="muted text-xs">選択したファイルは Google Drive へ直接アップロードされます</p>
+            </div>
+            <ul id="owner-selected-files" class="selected-file-list"></ul>
+          </div>
+
+          <!-- 転送中の画面ロック防止スイッチ -->
+          <div class="toggle-row">
+            <div class="toggle-copy">
+              <span class="toggle-title">転送中は画面をロックしない</span>
+              <span class="toggle-desc muted text-xs" data-wakelock-hint>大容量ファイルの送信中にスリープで中断されるのを防ぎます</span>
+            </div>
+            <label class="toggle-switch" aria-label="転送中は画面をロックしない">
+              <input type="checkbox" class="toggle-input" data-wakelock-toggle checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 箱主アップロード進捗バー -->
+        <div id="owner-upload-progress" class="progress-panel hidden">
+          <div class="progress-header">
+            <span id="owner-upload-status-text">アップロード中...</span>
+            <span id="owner-upload-count-text" class="progress-count">0 / 0</span>
+          </div>
+          <div class="progress-track">
+            <div id="owner-upload-bar" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <p id="owner-upload-file-text" class="muted text-xs"></p>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close-modal="modal-create-box">キャンセル</button>
+          <button type="submit" id="btn-create-box-submit" class="btn btn-primary">箱を作成する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- モーダル: 共有URL・QRコード表示 -->
+  <div id="modal-share-box" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-share-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-share-title">箱の鍵を共有する</h2>
+        <button type="button" class="btn-icon" data-close-modal="modal-share-box" aria-label="閉じる">✕</button>
+      </div>
+      <div class="modal-body stack-md">
+        <p id="share-box-name" class="share-box-title"></p>
+        <div id="share-qr-container" class="qr-container" aria-label="共有URLのQRコード"></div>
+
+        <div>
+          <label class="field-label" for="input-share-url">共有URL</label>
+          <div class="input-group">
+            <input type="text" id="input-share-url" class="input" readonly>
+            <button type="button" id="btn-copy-share-url" class="btn btn-primary btn-sm">コピー</button>
+          </div>
+        </div>
+
+        <div id="share-passcode-notice" class="notice-box hidden">
+          <strong>パスコードが設定されています：</strong>
+          <span id="share-passcode-value" class="code-badge hidden"></span>
+          <p class="text-xs muted">
+            ※ セキュリティのため、パスコードはURL・QRコードには含まれません。口頭や別メッセージでお伝えください。
+          </p>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-close-modal="modal-share-box">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル: 箱の完全削除（念押し確認） -->
+  <div id="modal-delete-box" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-delete-title">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-delete-title">箱を完全に削除する</h2>
+        <button type="button" class="btn-icon" data-close-modal="modal-delete-box" aria-label="閉じる">✕</button>
+      </div>
+      <div class="modal-body stack-md">
+        <div class="danger-box">
+          <strong>この操作は取り消せません。</strong>
+          <p class="text-sm">
+            Google Drive 上の箱フォルダと中身のファイル、および管理シートの記録が<strong>完全に削除</strong>されます（ゴミ箱にも残りません）。
+          </p>
+        </div>
+
+        <div class="delete-target-info">
+          <div class="text-xs muted">削除対象の箱</div>
+          <div id="delete-box-name" class="delete-target-name"></div>
+          <div id="delete-box-meta" class="text-xs muted"></div>
+        </div>
+
+        <label class="confirm-check">
+          <input type="checkbox" id="checkbox-confirm-delete">
+          <span>中のファイルを含めて復元できないことを理解し、完全に削除します</span>
+        </label>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" data-close-modal="modal-delete-box">キャンセル</button>
+          <button type="button" id="btn-confirm-delete-box" class="btn btn-danger" disabled>完全に削除する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 共通ローディングオーバーレイ（GAS通信時） -->
+  <div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite">
+    <div class="loading-box">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loading-text" class="loading-text">処理中です...</p>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- 同梱ライブラリ（Firebase Auth / QR生成） -->
+  <script src="./js/vendor/firebase-app-compat.js"></script>
+  <script src="./js/vendor/firebase-auth-compat.js"></script>
+  <script src="./js/vendor/qrcode.min.js"></script>
+
+  <!-- 環境設定（.gitignore対象。未作成でも auth.js 側で安全に警告表示する） -->
+  <script src="./config.js"></script>
+
+  <!-- アプリケーションスクリプト -->
+  <script src="./js/api.js"></script>
+  <script src="./js/auth.js"></script>
+  <script src="./js/owner.js"></script>
+  <script src="./js/guest.js"></script>
+  <script src="./js/router.js"></script>
+</body>
+</html>
