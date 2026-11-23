@@ -213,8 +213,6 @@ window.HakonushiOwner = (function () {
     var st = statusMap[box.status] || { label: box.status, cls: 'pill-disabled' };
     var files = box.files || [];
 
-    var canExtend = isActive || box.direction === 'RECEIVE' || box.status === 'LOCKED';
-
     card.innerHTML =
       '<div class="box-card-top">' +
         '<div class="box-title-group">' +
@@ -227,11 +225,11 @@ window.HakonushiOwner = (function () {
         '</div>' +
         '<div class="box-actions">' +
           (isActive ? '<button type="button" class="btn btn-primary btn-sm" data-action="share">共有URL・QR</button>' : '') +
-          (canExtend ? '<button type="button" class="btn btn-ghost btn-sm" data-action="extend">' + (isActive ? '期限延長' : '再開・延長') + '</button>' : '') +
+          '<button type="button" class="btn btn-ghost btn-sm" data-action="extend">' + (isActive ? '期限延長' : '再開・延長') + '</button>' +
           '<button type="button" class="btn btn-ghost btn-sm" data-action="toggle-files">ファイル (' + files.length + ')</button>' +
           (box.folder_url ? '<a class="btn btn-ghost btn-sm" href="' + api.escapeHtml(box.folder_url) + '" target="_blank" rel="noopener noreferrer">Driveで開く</a>' : '') +
           (isActive ? '<button type="button" class="btn btn-ghost btn-sm" data-action="disable">無効化</button>' : '') +
-          '<button type="button" class="btn btn-danger-ghost btn-sm" data-action="delete">完全削除</button>' +
+          '<button type="button" class="btn btn-danger-ghost btn-sm" data-action="delete">削除</button>' +
         '</div>' +
       '</div>' +
       '<div class="box-meta">' +
@@ -341,9 +339,7 @@ window.HakonushiOwner = (function () {
   }
 
   async function handleDisableBox(box, triggerButton) {
-    var msg = box.direction === 'SEND'
-      ? '「' + (box.box_name || box.box_id) + '」を無効化しますか？\n箱主→ゲストの箱のため、Google Drive上の箱フォルダもゴミ箱へ移動されます。'
-      : '「' + (box.box_name || box.box_id) + '」を無効化しますか？\n以降ゲストからの投稿はできなくなりますが、受け取ったファイルはDriveに残ります。';
+    var msg = '「' + (box.box_name || box.box_id) + '」を無効化しますか？\n以降ゲストからはアクセスできなくなりますが、Google Drive 上のファイルはそのまま残ります（あとから再開・延長できます）。';
 
     if (!window.confirm(msg)) return;
 
@@ -428,11 +424,11 @@ window.HakonushiOwner = (function () {
       await window.HakonushiApi.callGas(
         'deleteBox',
         { idToken: idToken, boxId: targetBox.box_id },
-        { loadingText: '箱を完全削除中...', triggerButton: triggerButton }
+        { loadingText: '箱を削除中...', triggerButton: triggerButton }
       );
       document.getElementById('modal-delete-box').classList.add('hidden');
       pendingDeleteBox = null;
-      window.HakonushiApi.showToast('箱を完全に削除しました。', 'success');
+      window.HakonushiApi.showToast('箱を削除し、Driveフォルダをゴミ箱へ移動しました。', 'success');
       await loadBoxes();
     } catch (err) {
       window.HakonushiApi.showToast(err.message || '箱の削除に失敗しました。', 'error', 5500);

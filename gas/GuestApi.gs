@@ -41,9 +41,6 @@ function assertGuestBoxAccess_(boxId, passcode, options) {
       if (latest && latest.status === BOX_STATUS.ACTIVE) {
         updateBoxByRowIndex(latest._rowIndex, { status: BOX_STATUS.EXPIRED });
         revokeBoxFilesSharingSafe(latest.box_id);
-        if (latest.direction === BOX_DIRECTION.SEND && latest.folder_id) {
-          trashFolderSafe(latest.folder_id);
-        }
       }
     });
     throw createAppError('BOX_EXPIRED', 'この箱は有効期限が切れています。');

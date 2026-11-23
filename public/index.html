@@ -408,18 +408,18 @@
     </div>
   </div>
 
-  <!-- モーダル: 箱の完全削除（念押し確認） -->
+  <!-- モーダル: 箱の削除（念押し確認・Driveゴミ箱へ移動） -->
   <div id="modal-delete-box" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-delete-title">
     <div class="modal">
       <div class="modal-header">
-        <h2 id="modal-delete-title">箱を完全に削除する</h2>
+        <h2 id="modal-delete-title">箱を削除する</h2>
         <button type="button" class="btn-icon" data-close-modal="modal-delete-box" aria-label="閉じる">✕</button>
       </div>
       <div class="modal-body stack-md">
         <div class="danger-box">
-          <strong>この操作は取り消せません。</strong>
+          <strong>箱の一覧から削除されます。</strong>
           <p class="text-sm">
-            Google Drive 上の箱フォルダと中身のファイル、および管理シートの記録が<strong>完全に削除</strong>されます（ゴミ箱にも残りません）。
+            管理シートの記録が削除され、Google Drive 上の箱フォルダと中身のファイルは<strong>ゴミ箱へ移動</strong>されます（同じURLでの再共有はできなくなります）。
           </p>
         </div>
 
@@ -431,12 +431,12 @@
 
         <label class="confirm-check">
           <input type="checkbox" id="checkbox-confirm-delete">
-          <span>中のファイルを含めて復元できないことを理解し、完全に削除します</span>
+          <span>Google Drive のゴミ箱へ移動し、箱を削除することを確認しました</span>
         </label>
 
         <div class="modal-footer">
           <button type="button" class="btn btn-ghost" data-close-modal="modal-delete-box">キャンセル</button>
-          <button type="button" id="btn-confirm-delete-box" class="btn btn-danger" disabled>完全に削除する</button>
+          <button type="button" id="btn-confirm-delete-box" class="btn btn-danger" disabled>箱を削除する</button>
         </div>
       </div>
     </div>

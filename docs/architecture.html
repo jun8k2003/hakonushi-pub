@@ -657,9 +657,9 @@
           <span class="step-badge badge-drive">Phase C：自動お掃除 &amp; 更新</span>
           <h3>放置しても自動で安全側へ閉じる</h3>
           <ul>
-            <li><strong>期限切れ自動処理</strong>: 1時間おきトリガーで期限超過箱を <code>EXPIRED</code> 化。<code>SEND</code> 箱はゴミ箱へ移動、<code>RECEIVE</code> 箱の受取ファイルは保持。</li>
+            <li><strong>期限切れ自動処理</strong>: 1時間おきトリガーで期限超過箱を <code>EXPIRED</code> 化し、一時公開権限を即時解除。Drive フォルダは保持されるため、必要なら箱主が同じ URL のまま「再開・延長」可能。</li>
             <li><strong>一時共有の自動回収</strong>: ゲスト DL から6時間猶予経過後、<code>Drive.Permissions.remove()</code> で <code>anyone</code> 権限を確実に削除（失敗時は次回再試行）。</li>
-            <li><strong>完全削除</strong>: 不要になった箱は念押し確認モーダルから Drive フォルダごと完全削除して空き容量を回収。</li>
+            <li><strong>箱の削除</strong>: 不要になった箱は念押し確認モーダルから削除可能。管理シートの記録を削除し、Google Drive 上の箱フォルダをゴミ箱へ移動します。</li>
           </ul>
         </div>
       </div>
@@ -835,7 +835,7 @@
               edgeColor: 'active-drive',
               nodes: ['node-guest', 'node-gas', 'node-drive'],
               caption: 'ゲスト ← Google Drive（ブラウザ標準ダウンロード）',
-              code: '1) Write-Ahead: TEMP_SHARED_FILES_JSON へ解除予定(6h後)を記録\n2) file.setSharing(ANYONE_WITH_LINK, VIEW)\n3) GET https://drive.google.com/uc?export=download&id=<file_id>'
+              code: '1) Write-Ahead: TEMP_SHARED_FILES_JSON へ解除予定(6h後)を記録\n2) file.setSharing(ANYONE_WITH_LINK, VIEW)\n3) GET https://drive.usercontent.google.com/download?id=<file_id>&export=download&confirm=t'
             }
           ]
         },
@@ -925,24 +925,24 @@
             {
               badge: '期限切れ箱の整理',
               badgeClass: 'badge-gas',
-              title: '3. 期限超過箱を EXPIRED 化（SEND はゴミ箱・RECEIVE は保持）',
-              desc: 'expires_at を過ぎた ACTIVE 箱を EXPIRED に更新し、配下の一時公開権限を即時削除。SEND 箱の Drive フォルダはゴミ箱へ移動し、RECEIVE 箱の受取ファイルは箱主のために保持します。',
+              title: '3. 期限超過箱を EXPIRED 化（公開権限のみ即時解除・フォルダ保持）',
+              desc: 'expires_at を過ぎた ACTIVE 箱を EXPIRED に更新し、配下の一時公開権限を即時削除します。Drive フォルダ自体は SEND / RECEIVE とも保持されるため、取り損ねた相手がいれば箱主が同じ URL のまま「再開・延長」できます。',
               edge: 'edge-gas-drive',
               edgeColor: 'active-drive',
               nodes: ['node-gas', 'node-drive'],
-              caption: 'GAS → Drive（SEND ゴミ箱移動 / RECEIVE 保持）',
-              code: 'if (box.direction === "SEND") trashFolderSafe(box.folder_id);\n// RECEIVE 箱の受取ファイルは自動削除しない'
+              caption: 'GAS → Drive（公開権限の即時解除・フォルダ保持）',
+              code: 'updateBoxByRowIndex(row, { status: "EXPIRED" });\nrevokeBoxFilesSharingSafe(box.box_id);\n// Driveフォルダは保持（箱主の「再開・延長」に対応）'
             },
             {
-              badge: '手動完全削除',
+              badge: '箱主による削除',
               badgeClass: 'badge-owner',
-              title: '4. 箱主による「完全削除」（念押し確認モーダル付き）',
-              desc: '不要になった箱は箱主ダッシュボードから念押しチェック付きで完全削除可能。Drive.Files.remove() でゴミ箱を経由せずフォルダごと完全削除し、管理シートの行も削除して空き容量を即座に回収します。',
+              title: '4. 箱主による「削除」（念押し確認付き・Drive ゴミ箱へ移動）',
+              desc: '不要になった箱は箱主ダッシュボードから念押しチェック付きで削除します。公開権限を解除したうえで Drive フォルダをゴミ箱へ移動し、管理シートの boxes / files 行を削除します。',
               edge: 'edge-owner-gas',
               edgeColor: 'active-gas',
               nodes: ['node-owner', 'node-gas', 'node-drive'],
-              caption: '箱主 → GAS → Drive（Drive.Files.remove で完全削除）',
-              code: 'POST /exec { action: "deleteBox", idToken, boxId }\n→ Drive.Files.remove(folderId) + deleteFilesByBoxId + deleteBoxByRowIndex'
+              caption: '箱主 → GAS → Drive（ゴミ箱移動＋DB行削除）',
+              code: 'POST /exec { action: "deleteBox", idToken, boxId }\n→ revokeBoxFilesSharingSafe + trashFolderSafe(folderId) + deleteFilesByBoxId + deleteBoxByRowIndex'
             }
           ]
         }

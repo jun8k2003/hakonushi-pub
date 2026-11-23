@@ -124,7 +124,7 @@ function handleCreateBox(owner, payload) {
 }
 
 /**
- * 箱を無効化する（SEND箱の場合はDriveフォルダもゴミ箱へ移動）
+ * 箱を無効化する（公開権限を即時解除。Driveフォルダは保持し、再開・延長が可能）
  * @param {{ email: string }} owner
  * @param {Object} payload
  */
@@ -149,10 +149,6 @@ function handleDisableBox(owner, payload) {
 
     revokeBoxFilesSharingSafe(box.box_id);
 
-    if (box.direction === BOX_DIRECTION.SEND && box.folder_id) {
-      trashFolderSafe(box.folder_id);
-    }
-
     return box;
   });
 
@@ -163,7 +159,7 @@ function handleDisableBox(owner, payload) {
 }
 
 /**
- * 箱を完全削除する（Driveフォルダ完全削除＋スプレッドシートのboxes/files行を削除）
+ * 箱を削除する（公開権限解除＋Driveフォルダをゴミ箱へ移動＋スプレッドシートのboxes/files行を削除）
  * @param {{ email: string }} owner
  * @param {Object} payload
  */
@@ -185,7 +181,7 @@ function handleDeleteBox(owner, payload) {
     revokeBoxFilesSharingSafe(box.box_id);
 
     if (box.folder_id) {
-      permanentlyDeleteFolderSafe(box.folder_id);
+      trashFolderSafe(box.folder_id);
     }
 
     var deletedFiles = deleteFilesByBoxId(box.box_id);

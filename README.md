@@ -38,8 +38,9 @@ Google Drive の共有機能で「相手からファイルをもらう」には�
 ## 主な特徴
 
 * **2種類の箱と明確な権限分離**:
-  * **箱主→ゲスト (`SEND`)**: 複数ファイルを箱に入れて共有。期限切れ・無効化時に Drive フォルダを自動でゴミ箱へ移動。
+  * **箱主→ゲスト (`SEND`)**: 複数ファイルを箱に入れて共有（有効期限は 30 分〜30 日から選択）。ゲスト側にも別端末転送用の QR コードを表示。期限切れ・無効化時は公開権限のみ即時解除し、必要なら同じ URL のまま **期限延長・再開** が可能。
   * **箱主←ゲスト (`RECEIVE`)**: 空の箱を共有して相手から動画や写真を回収。ゲストからは投稿・誤送信の取消のみ可能（**他者のファイルを含めダウンロード不可**）。
+  * **安全な削除運用**: 不要になった箱は箱主の「削除」操作（念押し確認付き）で管理シートから削除し、Google Drive のゴミ箱へ移動します。
 * **15 GB クラスの大容量動画に対応**:
   * Google Drive API v3 の Resumable Upload を使い、ブラウザから Google Drive へ **16 MB ずつのチャンク分割で直接 `PUT`** します（GAS の 50 MB 制限を回避・自動リトライ＆途中再開対応）。
   * 送信中のスリープ中断を防ぐ **「転送中は画面をロックしない」トグル**（Screen Wake Lock API）を搭載。
@@ -72,7 +73,7 @@ Google Drive の共有機能で「相手からファイルをもらう」には�
   * UI / UX: Screen Wake Lock API（転送中の画面ロック防止）、`qrcode-generator`（ローカル SVG QR コード生成）
   * 同梱ライブラリ: Firebase JS SDK v10（compat）、`qrcode-generator` v1.4.4
 * **バックエンド**: Google Apps Script（V8 ランタイム）
-  * ストレージ API: Google Drive API v3（Resumable Upload / `Drive.Permissions` / `Drive.Files.remove`）
+  * ストレージ API: Google Drive API v3（Resumable Upload / `Drive.Permissions`）＋ `DriveApp`
   * 認証検証: Firebase Identity Toolkit REST API（`accounts:lookup`）＋ 許可メールアドレスリスト照合
   * 排他制御・暗号化: `LockService.getScriptLock()`、`Utilities.computeHmacSha256Signature()`
 
@@ -95,7 +96,7 @@ hakonushi-pub/
 │   ├── Config.gs              # 設定読み込み・フォルダ相対解決・openById 透過取得
 │   ├── Database.gs            # setupDatabase()・LockService 排他制御・CRUD
 │   ├── Auth.gs                # Firebase ID トークン検証・HMAC-SHA256
-│   ├── DriveHelper.gs         # Resumable Upload・権限管理・完全削除
+│   ├── DriveHelper.gs         # Resumable Upload・権限管理・ゴミ箱移動
 │   ├── OwnerApi.gs            # 箱主向け API ハンドラ
 │   ├── GuestApi.gs            # ゲスト向け API ハンドラ
 │   ├── Main.gs                # doPost ルーター

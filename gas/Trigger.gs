@@ -11,7 +11,6 @@
 function cleanupExpiredBoxes() {
   var nowMs = new Date().getTime();
   var expiredCount = 0;
-  var trashedSendFolders = 0;
   var tempShareResult = { revokedCount: 0, unverifiableCount: 0 };
 
   withScriptLock(function () {
@@ -33,26 +32,19 @@ function cleanupExpiredBoxes() {
       });
       expiredCount++;
 
+      // 期限切れ時は公開権限のみ即時解除し、Driveフォルダ自体は保持（箱主の削除操作でゴミ箱へ移動）
       revokeBoxFilesSharingSafe(box.box_id);
-
-      if (box.direction === BOX_DIRECTION.SEND && box.folder_id) {
-        if (trashFolderSafe(box.folder_id)) {
-          trashedSendFolders++;
-        }
-      }
     }
   });
 
   Logger.log(
     'cleanupExpiredBoxes completed: expired=' + expiredCount +
-    ', trashedSendFolders=' + trashedSendFolders +
     ', revokedTempShares=' + tempShareResult.revokedCount +
     ', unverifiableTempShares=' + tempShareResult.unverifiableCount
   );
 
   return {
     expiredCount: expiredCount,
-    trashedSendFolders: trashedSendFolders,
     revokedTempShares: tempShareResult.revokedCount,
     unverifiableTempShares: tempShareResult.unverifiableCount
   };
