@@ -856,12 +856,12 @@
               badge: '上限チェック',
               badgeClass: 'badge-gas',
               title: '2. ゲストが上限検証を通過してアップロードセッションを取得',
-              desc: 'ゲストが動画等を選択すると GAS が 1ファイル最大 15 GB・1箱最大 50 件・合計最大 50 GB・ALLOWED_ORIGINS を検証し、Drive API の一時アップロード URI を発行します。',
+              desc: 'ゲストが動画等を選択すると GAS が 1ファイル最大 15 GB・1箱最大 1,000 件・合計最大 50 GB・ALLOWED_ORIGINS を検証し、Drive API の一時アップロード URI を発行します。',
               edge: 'edge-guest-gas',
               edgeColor: 'active-gas',
               nodes: ['node-guest', 'node-gas', 'node-drive'],
               caption: 'ゲスト → GAS（容量/件数/Origin 検証 → URI 発行）',
-              code: 'POST /exec { action: "initGuestUploadSession", boxId, passcode, fileSize, origin }\nCheck: fileSize <= 15GB && files < 50 && total <= 50GB'
+              code: 'POST /exec { action: "initGuestUploadSession", boxId, passcode, fileSize, origin }\nCheck: fileSize <= 15GB && files < 1000 && total <= 50GB'
             },
             {
               badge: '16 MB チャンク送信',

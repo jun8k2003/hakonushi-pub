@@ -16,7 +16,7 @@ var SPREADSHEET_ID_PROP_KEY = 'SPREADSHEET_ID';
 
 // ゲストアップロードの上限（デフォルト値・スクリプトプロパティで上書き可能）
 var DEFAULT_GUEST_MAX_FILE_SIZE_MB = 15 * 1024;  // 1ファイル最大 15GB (15,360MB)
-var DEFAULT_GUEST_MAX_FILES_PER_BOX = 50;        // 1箱あたり最大 50件
+var DEFAULT_GUEST_MAX_FILES_PER_BOX = 1000;      // 1箱あたり最大 1,000件
 var DEFAULT_GUEST_MAX_TOTAL_SIZE_MB = 50 * 1024; // 1箱あたり合計最大 50GB (51,200MB)
 
 var BOX_STATUS = {

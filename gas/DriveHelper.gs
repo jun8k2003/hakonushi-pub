@@ -317,34 +317,34 @@ function revokeFileSharingSafe(fileId) {
 }
 
 /**
- * 指定された箱配下のファイルの公開権限をすべて削除し、終了確認できた記録のみ一時共有リストから除外する
+ * 指定された箱で一時公開（TEMP_SHARED_FILES_JSON に記録）されているファイルの公開権限をすべて削除し、
+ * 終了確認できた記録のみ一時共有リストから除外する。
+ * （Write-Ahead 記録により、一時公開されたファイルのみをピンポイント処理できるため 1000件入りの箱でも高速）
  * @param {string} boxId
  */
 function revokeBoxFilesSharingSafe(boxId) {
   var safeBoxId = String(boxId || '').trim();
   if (!safeBoxId) return;
 
-  var files = findFilesByBoxId(safeBoxId, true);
-  var targetIds = {};
-  for (var i = 0; i < files.length; i++) {
-    targetIds[files[i].file_id] = true;
-  }
-
   var map = readTempSharedMap_();
+  var targetIds = [];
   Object.keys(map).forEach(function (fid) {
     if (map[fid] && map[fid].boxId === safeBoxId) {
-      targetIds[fid] = true;
+      targetIds.push(fid);
     }
   });
 
+  if (targetIds.length === 0) return;
+
   var changed = false;
-  Object.keys(targetIds).forEach(function (fid) {
+  for (var i = 0; i < targetIds.length; i++) {
+    var fid = targetIds[i];
     var status = revokeFileSharingSafe(fid);
     if ((status === 'REVOKED' || status === 'UNVERIFIABLE') && map[fid]) {
       delete map[fid];
       changed = true;
     }
-  });
+  }
 
   if (changed) {
     writeTempSharedMap_(map);

@@ -322,17 +322,39 @@ function deleteFilesByBoxId(boxId) {
   var target = String(boxId || '').trim();
   if (!target) return 0;
   var sheet = getSheetOrThrow_(SHEET_FILES);
-  var files = findAllFiles().filter(function (f) {
-    return f.box_id === target;
-  });
-  // 行番号の大きい方から削除して行ズレを防ぐ
-  files.sort(function (a, b) {
-    return b._rowIndex - a._rowIndex;
-  });
-  for (var i = 0; i < files.length; i++) {
-    sheet.deleteRow(files[i]._rowIndex);
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow <= 1 || lastCol === 0) return 0;
+
+  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  var headers = values[0].map(function (h) { return String(h).trim(); });
+  var boxIdCol = headers.indexOf('box_id');
+  if (boxIdCol === -1) return 0;
+
+  // 1000件超でもタイムアウトしないよう、メモリ上で絞り込んで一括書き戻しする
+  var keptRows = [];
+  var deletedCount = 0;
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][boxIdCol] || '').trim() === target) {
+      deletedCount++;
+    } else {
+      keptRows.push(values[r].map(sanitizeSheetCellValue_));
+    }
   }
-  return files.length;
+
+  if (deletedCount === 0) return 0;
+
+  // 既存データ行をクリアし、残存行を一括で書き込む
+  sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+  if (keptRows.length > 0) {
+    sheet.getRange(2, 1, keptRows.length, lastCol).setValues(keptRows);
+  }
+  // 末尾の余分な空行を削除してシートを綺麗に保つ
+  var extraRows = (lastRow - 1) - keptRows.length;
+  if (extraRows > 0) {
+    sheet.deleteRows(2 + keptRows.length, extraRows);
+  }
+  return deletedCount;
 }
 
 function normalizeFileRecord_(row) {
