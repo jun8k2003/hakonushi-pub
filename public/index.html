@@ -75,11 +75,13 @@
       <!-- 2. 箱主ダッシュボード画面 -->
       <section id="view-owner" class="view hidden" aria-label="箱主ダッシュボード">
         <div class="toolbar">
-          <h1 class="page-title">あなたの箱一覧</h1>
+          <div class="toolbar-heading">
+            <h1 class="page-title">あなたの箱一覧</h1>
+            <button type="button" id="btn-refresh-boxes" class="btn btn-ghost btn-sm" title="一覧を更新">↻ 更新</button>
+          </div>
           <div class="toolbar-actions">
             <button type="button" id="btn-create-send" class="btn btn-primary">＋ 箱主 -&gt; ゲスト</button>
             <button type="button" id="btn-create-receive" class="btn btn-secondary">＋ 箱主 &lt;- ゲスト</button>
-            <button type="button" id="btn-refresh-boxes" class="btn btn-ghost" title="一覧を更新">↻ 更新</button>
           </div>
         </div>
 

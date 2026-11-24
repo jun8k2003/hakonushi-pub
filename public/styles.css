@@ -79,6 +79,8 @@ body {
   text-decoration: none;
   color: var(--text);
   font-weight: 700;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .brand-icon {
@@ -97,18 +99,29 @@ body {
   padding: 2px 8px;
   border-radius: 999px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .header-user {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.header-user .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .user-email {
   font-size: 0.85rem;
   color: var(--text-muted);
   max-width: 220px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -420,6 +433,14 @@ body {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.toolbar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1 1 auto;
 }
 
 .toolbar-actions {
@@ -1042,13 +1063,40 @@ body {
 
 /* Responsive */
 @media (max-width: 680px) {
+  .header-inner {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .brand {
+    gap: 6px;
+  }
+
+  .brand-title {
+    font-size: 1.02rem;
+  }
+
+  .brand-sub {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+
+  .header-user {
+    gap: 6px;
+  }
+
+  .user-email {
+    font-size: 0.78rem;
+    max-width: 96px;
+  }
+
   .entry-grid,
   .form-row {
     grid-template-columns: 1fr;
   }
 
-  .user-email {
-    max-width: 130px;
+  .toolbar-heading {
+    width: 100%;
   }
 
   .toolbar-actions {
