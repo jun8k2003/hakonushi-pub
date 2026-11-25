@@ -52,6 +52,7 @@ function assertGuestBoxAccess_(boxId, passcode, options) {
       var latest = findBoxById(safeBoxId);
       if (latest && latest.status === BOX_STATUS.ACTIVE) {
         updateBoxByRowIndex(latest._rowIndex, { status: BOX_STATUS.DISABLED });
+        revokeBoxFilesSharingSafe(latest.box_id);
       }
     });
     throw createAppError('BOX_DISABLED', 'この箱は共有が終了しています。');

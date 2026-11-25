@@ -11,6 +11,7 @@
 function cleanupExpiredBoxes() {
   var nowMs = new Date().getTime();
   var expiredCount = 0;
+  var trashedDetectedCount = 0;
   var tempShareResult = { revokedCount: 0, unverifiableCount: 0 };
 
   withScriptLock(function () {
@@ -23,6 +24,17 @@ function cleanupExpiredBoxes() {
       if (box.status !== BOX_STATUS.ACTIVE) {
         continue;
       }
+
+      // Google Drive 上で手動でゴミ箱移動／削除された箱を検知して無効化＋公開権限を即時解除
+      if (!isFolderAlive(box.folder_id)) {
+        updateBoxByRowIndex(box._rowIndex, {
+          status: BOX_STATUS.DISABLED
+        });
+        revokeBoxFilesSharingSafe(box.box_id);
+        trashedDetectedCount++;
+        continue;
+      }
+
       if (!isExpiredIso_(box.expires_at, nowMs)) {
         continue;
       }
@@ -39,12 +51,14 @@ function cleanupExpiredBoxes() {
 
   Logger.log(
     'cleanupExpiredBoxes completed: expired=' + expiredCount +
+    ', trashedDetected=' + trashedDetectedCount +
     ', revokedTempShares=' + tempShareResult.revokedCount +
     ', unverifiableTempShares=' + tempShareResult.unverifiableCount
   );
 
   return {
     expiredCount: expiredCount,
+    trashedDetectedCount: trashedDetectedCount,
     revokedTempShares: tempShareResult.revokedCount,
     unverifiableTempShares: tempShareResult.unverifiableCount
   };
