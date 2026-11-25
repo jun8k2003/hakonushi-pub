@@ -186,8 +186,12 @@
                   <label class="field-label" for="input-guest-files">ファイル選択（複数可）</label>
                   <div id="guest-dropzone" class="dropzone" tabindex="0">
                     <input type="file" id="input-guest-files" class="file-input-hidden" multiple>
-                    <p class="dropzone-title">クリックしてファイルを選択、またはここにドロップ</p>
-                    <p class="muted text-xs">大容量ファイル（50MB超）もそのままアップロードできます</p>
+                    <div class="dropzone-bg-icons" aria-hidden="true"></div>
+                    <div class="dropzone-fg">
+                      <div class="dropzone-count-badge hidden"></div>
+                      <p class="dropzone-title">クリックしてファイルを選択、またはここにドロップ</p>
+                      <p class="dropzone-sub muted text-xs">大容量ファイル（50MB超）もそのままアップロードできます</p>
+                    </div>
                   </div>
                   <ul id="guest-selected-files" class="selected-file-list"></ul>
                 </div>
@@ -299,8 +303,12 @@
             <label class="field-label" for="input-owner-files">渡すファイル（複数選択可）</label>
             <div id="owner-dropzone" class="dropzone" tabindex="0">
               <input type="file" id="input-owner-files" class="file-input-hidden" multiple>
-              <p class="dropzone-title">クリックしてファイルを選択、またはここにドロップ</p>
-              <p class="muted text-xs">大容量ファイル（動画など）もそのままアップロードできます</p>
+              <div class="dropzone-bg-icons" aria-hidden="true"></div>
+              <div class="dropzone-fg">
+                <div class="dropzone-count-badge hidden"></div>
+                <p class="dropzone-title">クリックしてファイルを選択、またはここにドロップ</p>
+                <p class="dropzone-sub muted text-xs">大容量ファイル（動画など）もそのままアップロードできます</p>
+              </div>
             </div>
             <ul id="owner-selected-files" class="selected-file-list"></ul>
           </div>

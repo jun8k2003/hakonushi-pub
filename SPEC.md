@@ -69,6 +69,14 @@
 | `status` | `ACTIVE` / `DELETED` | ゲスト取消時は `DELETED` 論理削除＋Driveゴミ箱移動 |
 | `uploaded_at` | ISO 8601 | アップロード完了日時 |
 
+### 4.3 ジャーナルシート（追記専用：監査・運用履歴）
+
+既存の `boxes` / `files` が更新・削除されても操作履歴を追跡できるよう、以下3つの追記専用シートを用意する（`setupDatabase()` で自動生成、未作成時も初回追記時に自動作成）。未定義イベントは `OTHER` へフォールバックする。
+
+* **`boxes_journal`**: `logged_at`, `event_type`（`CREATE` / `EXTEND` / `DISABLE` / `DELETE` / `EXPIRE` / `LOCK` / `DRIVE_TRASHED` / `PASSCODE_FAIL` / `OTHER`）, `actor_type`, `actor_id`, `box_id`, `box_name`, `direction`, `status_before`, `status_after`, `expires_at`, `note`
+* **`files_journal`**: `logged_at`, `event_type`（`UPLOAD` / `DELETE_BY_GUEST` / `DELETE_BY_BOX` / `REJECT_LIMIT` / `OTHER`）, `actor_type`, `actor_id`, `box_id`, `file_id`, `file_name`, `file_size`, `mime_type`, `note`
+* **`download_journal`**: ダウンロードボタン押下による GAS の URL 発行時に追記。`logged_at`, `actor_type`, `actor_id`, `box_id`, `box_name`, `direction`, `file_id`, `file_name`, `file_size`
+
 ---
 
 ## 5. 共有URL（フラグメント）＆ QRコード仕様

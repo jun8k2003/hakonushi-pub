@@ -41,6 +41,18 @@ function assertGuestBoxAccess_(boxId, passcode, options) {
       if (latest && latest.status === BOX_STATUS.ACTIVE) {
         updateBoxByRowIndex(latest._rowIndex, { status: BOX_STATUS.EXPIRED });
         revokeBoxFilesSharingSafe(latest.box_id);
+        appendBoxJournal({
+          event_type: BOX_JOURNAL_EVENT.EXPIRE,
+          actor_type: JOURNAL_ACTOR.GUEST,
+          actor_id: '',
+          box_id: latest.box_id,
+          box_name: latest.box_name,
+          direction: latest.direction,
+          status_before: latest.status,
+          status_after: BOX_STATUS.EXPIRED,
+          expires_at: latest.expires_at,
+          note: 'detected_on_guest_access'
+        });
       }
     });
     throw createAppError('BOX_EXPIRED', 'この箱は有効期限が切れています。');
@@ -53,6 +65,18 @@ function assertGuestBoxAccess_(boxId, passcode, options) {
       if (latest && latest.status === BOX_STATUS.ACTIVE) {
         updateBoxByRowIndex(latest._rowIndex, { status: BOX_STATUS.DISABLED });
         revokeBoxFilesSharingSafe(latest.box_id);
+        appendBoxJournal({
+          event_type: BOX_JOURNAL_EVENT.DRIVE_TRASHED,
+          actor_type: JOURNAL_ACTOR.GUEST,
+          actor_id: '',
+          box_id: latest.box_id,
+          box_name: latest.box_name,
+          direction: latest.direction,
+          status_before: latest.status,
+          status_after: BOX_STATUS.DISABLED,
+          expires_at: latest.expires_at,
+          note: 'detected_on_guest_access'
+        });
       }
     });
     throw createAppError('BOX_DISABLED', 'この箱は共有が終了しています。');
@@ -94,6 +118,18 @@ function assertGuestBoxAccess_(boxId, passcode, options) {
         if (isLocked) {
           revokeBoxFilesSharingSafe(latest.box_id);
         }
+        appendBoxJournal({
+          event_type: isLocked ? BOX_JOURNAL_EVENT.LOCK : BOX_JOURNAL_EVENT.PASSCODE_FAIL,
+          actor_type: JOURNAL_ACTOR.GUEST,
+          actor_id: '',
+          box_id: latest.box_id,
+          box_name: latest.box_name,
+          direction: latest.direction,
+          status_before: latest.status,
+          status_after: isLocked ? BOX_STATUS.LOCKED : latest.status,
+          expires_at: latest.expires_at,
+          note: 'fail_count=' + nextFail
+        });
         return {
           ok: false,
           locked: isLocked,
@@ -209,6 +245,16 @@ function handleGetGuestDownloadUrl(payload) {
     }
 
     var downloadUrl = createGuestDownloadUrlUnlocked_(file.file_id, latestBox.box_id);
+    appendDownloadJournal({
+      actor_type: JOURNAL_ACTOR.GUEST,
+      actor_id: '',
+      box_id: latestBox.box_id,
+      box_name: latestBox.box_name,
+      direction: latestBox.direction,
+      file_id: file.file_id,
+      file_name: file.file_name,
+      file_size: file.file_size
+    });
     return {
       downloadUrl: downloadUrl,
       fileName: file.file_name
@@ -326,6 +372,17 @@ function handleCompleteGuestUpload(payload) {
       currentTotalBytes + meta.fileSize > limits.maxTotalBytesPerBox
     ) {
       trashFileSafe(meta.fileId);
+      appendFileJournal({
+        event_type: FILE_JOURNAL_EVENT.REJECT_LIMIT,
+        actor_type: JOURNAL_ACTOR.GUEST,
+        actor_id: uploaderName,
+        box_id: box.box_id,
+        file_id: meta.fileId,
+        file_name: meta.fileName,
+        file_size: meta.fileSize,
+        mime_type: meta.mimeType,
+        note: 'trashed_by_limit'
+      });
       throw createAppError(
         'BOX_STORAGE_LIMIT_EXCEEDED',
         'ファイルサイズまたは箱の容量・件数上限を超えたため、アップロードを取り消しました。'
@@ -333,6 +390,16 @@ function handleCompleteGuestUpload(payload) {
     }
 
     insertFile(fileRecord);
+    appendFileJournal({
+      event_type: FILE_JOURNAL_EVENT.UPLOAD,
+      actor_type: JOURNAL_ACTOR.GUEST,
+      actor_id: uploaderName,
+      box_id: box.box_id,
+      file_id: fileRecord.file_id,
+      file_name: fileRecord.file_name,
+      file_size: fileRecord.file_size,
+      mime_type: fileRecord.mime_type
+    });
   });
 
   return { file: toPublicFileDto_(fileRecord) };
@@ -367,6 +434,17 @@ function handleDeleteGuestFile(payload) {
       status: FILE_STATUS.DELETED
     });
     trashFileSafe(file.file_id);
+    appendFileJournal({
+      event_type: FILE_JOURNAL_EVENT.DELETE_BY_GUEST,
+      actor_type: JOURNAL_ACTOR.GUEST,
+      actor_id: file.uploader_name,
+      box_id: box.box_id,
+      file_id: file.file_id,
+      file_name: file.file_name,
+      file_size: file.file_size,
+      mime_type: file.mime_type,
+      note: 'status=DELETED'
+    });
   });
 
   return {

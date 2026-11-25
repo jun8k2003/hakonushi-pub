@@ -26,8 +26,47 @@ var FILES_HEADERS = [
   'uploaded_at'
 ];
 
+var BOXES_JOURNAL_HEADERS = [
+  'logged_at',
+  'event_type',
+  'actor_type',
+  'actor_id',
+  'box_id',
+  'box_name',
+  'direction',
+  'status_before',
+  'status_after',
+  'expires_at',
+  'note'
+];
+
+var FILES_JOURNAL_HEADERS = [
+  'logged_at',
+  'event_type',
+  'actor_type',
+  'actor_id',
+  'box_id',
+  'file_id',
+  'file_name',
+  'file_size',
+  'mime_type',
+  'note'
+];
+
+var DOWNLOAD_JOURNAL_HEADERS = [
+  'logged_at',
+  'actor_type',
+  'actor_id',
+  'box_id',
+  'box_name',
+  'direction',
+  'file_id',
+  'file_name',
+  'file_size'
+];
+
 /**
- * 初期化関数: `boxes` / `files` シートとヘッダー行を自動生成する
+ * 初期化関数: `boxes` / `files` および3つのジャーナルシートとヘッダー行を自動生成する
  * GASエディタから1クリックで実行可能
  */
 function setupDatabase() {
@@ -36,12 +75,18 @@ function setupDatabase() {
 
   ensureSheetWithHeaders_(ss, SHEET_BOXES, BOXES_HEADERS);
   ensureSheetWithHeaders_(ss, SHEET_FILES, FILES_HEADERS);
+  ensureSheetWithHeaders_(ss, SHEET_BOXES_JOURNAL, BOXES_JOURNAL_HEADERS);
+  ensureSheetWithHeaders_(ss, SHEET_FILES_JOURNAL, FILES_JOURNAL_HEADERS);
+  ensureSheetWithHeaders_(ss, SHEET_DOWNLOAD_JOURNAL, DOWNLOAD_JOURNAL_HEADERS);
 
-  Logger.log('hakonushi database setup completed: boxes, files (SPREADSHEET_ID=' + ss.getId() + ')');
+  Logger.log(
+    'hakonushi database setup completed: boxes, files, boxes_journal, files_journal, download_journal (SPREADSHEET_ID=' +
+    ss.getId() + ')'
+  );
   return {
     ok: true,
     spreadsheetId: ss.getId(),
-    sheets: [SHEET_BOXES, SHEET_FILES]
+    sheets: [SHEET_BOXES, SHEET_FILES, SHEET_BOXES_JOURNAL, SHEET_FILES_JOURNAL, SHEET_DOWNLOAD_JOURNAL]
   };
 }
 
@@ -369,4 +414,126 @@ function normalizeFileRecord_(row) {
     status: String(row.status || FILE_STATUS.ACTIVE),
     uploaded_at: String(row.uploaded_at || '')
   };
+}
+
+/* ===========================
+ * Journal (Append-Only) Helpers
+ * =========================== */
+
+function getOrCreateJournalSheet_(sheetName, headers) {
+  var ss = getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    ensureSheetWithHeaders_(ss, sheetName, headers);
+    sheet = ss.getSheetByName(sheetName);
+  }
+  return sheet;
+}
+
+function normalizeJournalEvent_(eventType, allowedEnum, note) {
+  var raw = String(eventType || '').trim();
+  var validValues = Object.keys(allowedEnum).map(function (k) { return allowedEnum[k]; });
+  if (validValues.indexOf(raw) !== -1) {
+    return { eventType: raw, note: String(note || '') };
+  }
+  var fallbackNote = 'raw_event=' + (raw || '(empty)');
+  var mergedNote = note ? (String(note) + '; ' + fallbackNote) : fallbackNote;
+  return { eventType: 'OTHER', note: mergedNote };
+}
+
+/**
+ * boxes_journal へ追記する（例外時は本体処理を止めずログ出力のみ行う）
+ * @param {Object} entry
+ */
+function appendBoxJournal(entry) {
+  try {
+    var sheet = getOrCreateJournalSheet_(SHEET_BOXES_JOURNAL, BOXES_JOURNAL_HEADERS);
+    var normalized = normalizeJournalEvent_(entry.event_type, BOX_JOURNAL_EVENT, entry.note);
+    appendSheetObject_(sheet, BOXES_JOURNAL_HEADERS, {
+      logged_at: entry.logged_at || new Date().toISOString(),
+      event_type: normalized.eventType,
+      actor_type: String(entry.actor_type || ''),
+      actor_id: String(entry.actor_id || ''),
+      box_id: String(entry.box_id || ''),
+      box_name: String(entry.box_name || ''),
+      direction: String(entry.direction || ''),
+      status_before: String(entry.status_before || ''),
+      status_after: String(entry.status_after || ''),
+      expires_at: String(entry.expires_at || ''),
+      note: normalized.note
+    });
+  } catch (e) {
+    Logger.log('appendBoxJournal failed: ' + (e && e.message ? e.message : e));
+  }
+}
+
+/**
+ * files_journal へ1件追記する（例外時は本体処理を止めずログ出力のみ行う）
+ * @param {Object} entry
+ */
+function appendFileJournal(entry) {
+  appendFileJournalsBatch([entry]);
+}
+
+/**
+ * files_journal へ複数件を一括追記する（箱削除時の大量ファイルにも対応）
+ * @param {Object[]} entries
+ */
+function appendFileJournalsBatch(entries) {
+  if (!entries || entries.length === 0) return;
+  try {
+    var sheet = getOrCreateJournalSheet_(SHEET_FILES_JOURNAL, FILES_JOURNAL_HEADERS);
+    var lastCol = sheet.getLastColumn();
+    var headers = lastCol > 0
+      ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h).trim(); })
+      : FILES_JOURNAL_HEADERS;
+
+    var nowIso = new Date().toISOString();
+    var rows = entries.map(function (entry) {
+      var normalized = normalizeJournalEvent_(entry.event_type, FILE_JOURNAL_EVENT, entry.note);
+      var record = {
+        logged_at: entry.logged_at || nowIso,
+        event_type: normalized.eventType,
+        actor_type: String(entry.actor_type || ''),
+        actor_id: String(entry.actor_id || ''),
+        box_id: String(entry.box_id || ''),
+        file_id: String(entry.file_id || ''),
+        file_name: String(entry.file_name || ''),
+        file_size: Number(entry.file_size || 0),
+        mime_type: String(entry.mime_type || ''),
+        note: normalized.note
+      };
+      return headers.map(function (key) {
+        return sanitizeSheetCellValue_(record[key]);
+      });
+    });
+
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rows.length, headers.length).setValues(rows);
+  } catch (e) {
+    Logger.log('appendFileJournalsBatch failed: ' + (e && e.message ? e.message : e));
+  }
+}
+
+/**
+ * download_journal へ追記する（ダウンロードURL発行時。例外時は本体処理を止めずログ出力のみ行う）
+ * @param {Object} entry
+ */
+function appendDownloadJournal(entry) {
+  try {
+    var sheet = getOrCreateJournalSheet_(SHEET_DOWNLOAD_JOURNAL, DOWNLOAD_JOURNAL_HEADERS);
+    appendSheetObject_(sheet, DOWNLOAD_JOURNAL_HEADERS, {
+      logged_at: entry.logged_at || new Date().toISOString(),
+      actor_type: String(entry.actor_type || ''),
+      actor_id: String(entry.actor_id || ''),
+      box_id: String(entry.box_id || ''),
+      box_name: String(entry.box_name || ''),
+      direction: String(entry.direction || ''),
+      file_id: String(entry.file_id || ''),
+      file_name: String(entry.file_name || ''),
+      file_size: Number(entry.file_size || 0)
+    });
+  } catch (e) {
+    Logger.log('appendDownloadJournal failed: ' + (e && e.message ? e.message : e));
+  }
 }

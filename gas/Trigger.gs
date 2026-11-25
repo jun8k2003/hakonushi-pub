@@ -31,6 +31,17 @@ function cleanupExpiredBoxes() {
           status: BOX_STATUS.DISABLED
         });
         revokeBoxFilesSharingSafe(box.box_id);
+        appendBoxJournal({
+          event_type: BOX_JOURNAL_EVENT.DRIVE_TRASHED,
+          actor_type: JOURNAL_ACTOR.TRIGGER,
+          actor_id: '',
+          box_id: box.box_id,
+          box_name: box.box_name,
+          direction: box.direction,
+          status_before: box.status,
+          status_after: BOX_STATUS.DISABLED,
+          expires_at: box.expires_at
+        });
         trashedDetectedCount++;
         continue;
       }
@@ -46,6 +57,17 @@ function cleanupExpiredBoxes() {
 
       // 期限切れ時は公開権限のみ即時解除し、Driveフォルダ自体は保持（箱主の削除操作でゴミ箱へ移動）
       revokeBoxFilesSharingSafe(box.box_id);
+      appendBoxJournal({
+        event_type: BOX_JOURNAL_EVENT.EXPIRE,
+        actor_type: JOURNAL_ACTOR.TRIGGER,
+        actor_id: '',
+        box_id: box.box_id,
+        box_name: box.box_name,
+        direction: box.direction,
+        status_before: box.status,
+        status_after: BOX_STATUS.EXPIRED,
+        expires_at: box.expires_at
+      });
     }
   });
 

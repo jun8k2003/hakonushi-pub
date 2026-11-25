@@ -529,6 +529,69 @@ window.HakonushiApi = (function () {
     };
   }
 
+  var DROPZONE_FILE_SVG =
+    '<svg width="44" height="44" viewBox="0 0 24 24" fill="currentColor">' +
+      '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>' +
+      '<path d="M14 2v6h6" fill="none" stroke="#ffffff" stroke-width="1.5"/>' +
+    '</svg>';
+
+  var DROPZONE_FOLDER_SVG =
+    '<svg width="60" height="60" viewBox="0 0 24 24" fill="currentColor">' +
+      '<path d="M10 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2z"/>' +
+    '</svg>';
+
+  /**
+   * 選択中ファイル数に応じてドロップエリアの視覚状態（半透明化＋左寄せ背景アイコン＋件数バッジ）を更新する
+   * @param {HTMLElement} dropzoneEl
+   * @param {number} count
+   * @param {string} defaultSubText
+   */
+  function updateDropzoneVisual(dropzoneEl, count, defaultSubText) {
+    if (!dropzoneEl) return;
+    var bgEl = dropzoneEl.querySelector('.dropzone-bg-icons');
+    var badgeEl = dropzoneEl.querySelector('.dropzone-count-badge');
+    var titleEl = dropzoneEl.querySelector('.dropzone-title');
+    var subEl = dropzoneEl.querySelector('.dropzone-sub');
+
+    if (bgEl) bgEl.innerHTML = '';
+
+    if (!count || count <= 0) {
+      dropzoneEl.classList.remove('has-files');
+      if (badgeEl) badgeEl.classList.add('hidden');
+      if (titleEl) titleEl.textContent = 'クリックしてファイルを選択、またはここにドロップ';
+      if (subEl && defaultSubText) subEl.textContent = defaultSubText;
+      return;
+    }
+
+    dropzoneEl.classList.add('has-files');
+    if (badgeEl) {
+      badgeEl.textContent = '✓ ' + count + ' 件のファイルを選択中';
+      badgeEl.classList.remove('hidden');
+    }
+    if (titleEl) titleEl.textContent = 'クリックまたはドロップでさらに追加できます';
+    if (subEl) subEl.textContent = '下のリストから不要なファイルを個別に取り消せます';
+
+    if (bgEl) {
+      if (count <= 5) {
+        for (var i = 0; i < count; i++) {
+          var w = document.createElement('span');
+          w.innerHTML = DROPZONE_FILE_SVG;
+          bgEl.appendChild(w);
+        }
+      } else {
+        var fw = document.createElement('span');
+        fw.innerHTML = DROPZONE_FOLDER_SVG;
+        bgEl.appendChild(fw);
+        for (var j = 0; j < 2; j++) {
+          var sw = document.createElement('span');
+          sw.style.opacity = '0.75';
+          sw.innerHTML = DROPZONE_FILE_SVG;
+          bgEl.appendChild(sw);
+        }
+      }
+    }
+  }
+
   return {
     showLoading: showLoading,
     hideLoading: hideLoading,
@@ -537,6 +600,7 @@ window.HakonushiApi = (function () {
     uploadFileDirectPut: uploadFileDirectPut,
     triggerBrowserDownload: triggerBrowserDownload,
     renderClickableQrCode: renderClickableQrCode,
+    updateDropzoneVisual: updateDropzoneVisual,
     formatFileSize: formatFileSize,
     formatDateTime: formatDateTime,
     escapeHtml: escapeHtml,

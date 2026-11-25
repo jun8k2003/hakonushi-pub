@@ -105,6 +105,18 @@ function handleCreateBox(owner, payload) {
 
   withScriptLock(function () {
     insertBox(record);
+    appendBoxJournal({
+      event_type: BOX_JOURNAL_EVENT.CREATE,
+      actor_type: JOURNAL_ACTOR.OWNER,
+      actor_id: owner.email,
+      box_id: record.box_id,
+      box_name: record.box_name,
+      direction: record.direction,
+      status_before: '',
+      status_after: record.status,
+      expires_at: record.expires_at,
+      note: 'has_passcode=' + Boolean(record.passcode_hash)
+    });
   });
 
   return {
@@ -149,6 +161,18 @@ function handleDisableBox(owner, payload) {
 
     revokeBoxFilesSharingSafe(box.box_id);
 
+    appendBoxJournal({
+      event_type: BOX_JOURNAL_EVENT.DISABLE,
+      actor_type: JOURNAL_ACTOR.OWNER,
+      actor_id: owner.email,
+      box_id: box.box_id,
+      box_name: box.box_name,
+      direction: box.direction,
+      status_before: box.status,
+      status_after: BOX_STATUS.DISABLED,
+      expires_at: box.expires_at
+    });
+
     return box;
   });
 
@@ -178,6 +202,8 @@ function handleDeleteBox(owner, payload) {
       throw createAppError('FORBIDDEN', 'この箱を削除する権限がありません。');
     }
 
+    var activeFilesBeforeDelete = findFilesByBoxId(box.box_id, true);
+
     revokeBoxFilesSharingSafe(box.box_id);
 
     if (box.folder_id) {
@@ -186,6 +212,35 @@ function handleDeleteBox(owner, payload) {
 
     var deletedFiles = deleteFilesByBoxId(box.box_id);
     deleteBoxByRowIndex(box._rowIndex);
+
+    if (activeFilesBeforeDelete.length > 0) {
+      appendFileJournalsBatch(activeFilesBeforeDelete.map(function (f) {
+        return {
+          event_type: FILE_JOURNAL_EVENT.DELETE_BY_BOX,
+          actor_type: JOURNAL_ACTOR.OWNER,
+          actor_id: owner.email,
+          box_id: box.box_id,
+          file_id: f.file_id,
+          file_name: f.file_name,
+          file_size: f.file_size,
+          mime_type: f.mime_type,
+          note: 'box_deleted'
+        };
+      }));
+    }
+
+    appendBoxJournal({
+      event_type: BOX_JOURNAL_EVENT.DELETE,
+      actor_type: JOURNAL_ACTOR.OWNER,
+      actor_id: owner.email,
+      box_id: box.box_id,
+      box_name: box.box_name,
+      direction: box.direction,
+      status_before: box.status,
+      status_after: 'DELETED',
+      expires_at: box.expires_at,
+      note: 'deleted_files=' + deletedFiles
+    });
 
     return {
       box_id: box.box_id,
@@ -239,6 +294,19 @@ function handleExtendBox(owner, payload) {
       status: BOX_STATUS.ACTIVE,
       fail_count: 0,
       expires_at: nextExpiresAt
+    });
+
+    appendBoxJournal({
+      event_type: BOX_JOURNAL_EVENT.EXTEND,
+      actor_type: JOURNAL_ACTOR.OWNER,
+      actor_id: owner.email,
+      box_id: box.box_id,
+      box_name: box.box_name,
+      direction: box.direction,
+      status_before: box.status,
+      status_after: BOX_STATUS.ACTIVE,
+      expires_at: nextExpiresAt,
+      note: 'hours=' + expiresHours
     });
 
     return {
@@ -304,6 +372,16 @@ function handleCompleteUpload(owner, payload) {
       throw createAppError('DUPLICATE_FILE', 'このファイルはすでに登録されています。');
     }
     insertFile(fileRecord);
+    appendFileJournal({
+      event_type: FILE_JOURNAL_EVENT.UPLOAD,
+      actor_type: JOURNAL_ACTOR.OWNER,
+      actor_id: owner.email,
+      box_id: box.box_id,
+      file_id: fileRecord.file_id,
+      file_name: fileRecord.file_name,
+      file_size: fileRecord.file_size,
+      mime_type: fileRecord.mime_type
+    });
   });
 
   return { file: toPublicFileDto_(fileRecord) };
@@ -335,6 +413,18 @@ function handleGetOwnerDownloadUrl(owner, payload) {
   }
 
   var downloadUrl = createOwnerDownloadUrl(file.file_id, owner.email);
+  withScriptLock(function () {
+    appendDownloadJournal({
+      actor_type: JOURNAL_ACTOR.OWNER,
+      actor_id: owner.email,
+      box_id: box.box_id,
+      box_name: box.box_name,
+      direction: box.direction,
+      file_id: file.file_id,
+      file_name: file.file_name,
+      file_size: file.file_size
+    });
+  });
   return {
     downloadUrl: downloadUrl,
     fileName: file.file_name

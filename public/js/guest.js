@@ -87,6 +87,12 @@ window.HakonushiGuest = (function () {
   function renderSelectedFiles() {
     var ul = document.getElementById('guest-selected-files');
     var submitBtn = document.getElementById('btn-guest-upload-submit');
+    var dropzone = document.getElementById('guest-dropzone');
+    window.HakonushiApi.updateDropzoneVisual(
+      dropzone,
+      selectedFiles.length,
+      '大容量ファイル（50MB超）もそのままアップロードできます'
+    );
     if (!ul) return;
 
     ul.innerHTML = '';

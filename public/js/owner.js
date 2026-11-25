@@ -108,6 +108,12 @@ window.HakonushiOwner = (function () {
 
   function renderSelectedFiles() {
     var ul = document.getElementById('owner-selected-files');
+    var dropzone = document.getElementById('owner-dropzone');
+    window.HakonushiApi.updateDropzoneVisual(
+      dropzone,
+      selectedFiles.length,
+      '大容量ファイル（動画など）もそのままアップロードできます'
+    );
     if (!ul) return;
     ul.innerHTML = '';
 
